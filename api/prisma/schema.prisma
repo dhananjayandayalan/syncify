@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Platform {
+  SPOTIFY
+  YOUTUBE
+}
+
+enum TrackStatus {
+  PENDING
+  SYNCED
+  NOT_FOUND
+  FAILED
+}
+
+enum SyncLogStatus {
+  SUCCESS
+  FAILED
+  NOT_FOUND
+}
+
+enum SyncAction {
+  ADD
+  REMOVE
+}
+
+enum TriggerType {
+  MANUAL
+  POLLING
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  connections   PlatformConnection[]
+  playlists     Playlist[]
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PlatformConnection {
+  id             String    @id @default(cuid())
+  userId         String
+  platform       Platform
+  accessToken    String
+  refreshToken   String?
+  expiresAt      DateTime?
+  platformUserId String
+  market         String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platform])
+  @@index([userId])
+}
+
+model Playlist {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tracks   PlaylistTrack[]
+  links    PlaylistLink[]
+  syncLogs SyncLog[]
+
+  @@index([userId])
+}
+
+model PlaylistLink {
+  id                 String    @id @default(cuid())
+  playlistId         String
+  platform           Platform
+  platformPlaylistId String?
+  isActive           Boolean   @default(true)
+  lastSyncedAt       DateTime?
+  snapshotId         String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+
+  @@unique([playlistId, platform])
+  @@index([playlistId])
+}
+
+model PlaylistTrack {
+  id         String   @id @default(cuid())
+  playlistId String
+  title      String
+  artist     String
+  album      String?
+  isrc       String?
+  durationMs Int?
+  position   Int
+  addedAt    DateTime @default(now())
+
+  playlist       Playlist        @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  platformTracks PlatformTrack[]
+
+  @@index([playlistId])
+  @@index([isrc])
+}
+
+model PlatformTrack {
+  id              String      @id @default(cuid())
+  playlistTrackId String
+  platform        Platform
+  platformTrackId String?
+  status          TrackStatus @default(PENDING)
+  failReason      String?
+  syncedAt        DateTime?
+
+  playlistTrack PlaylistTrack @relation(fields: [playlistTrackId], references: [id], onDelete: Cascade)
+
+  @@unique([playlistTrackId, platform])
+  @@index([playlistTrackId])
+}
+
+model SyncLog {
+  id          String        @id @default(cuid())
+  playlistId  String
+  platform    Platform
+  action      SyncAction
+  status      SyncLogStatus
+  trackTitle  String?
+  trackArtist String?
+  message     String?
+  triggeredBy TriggerType   @default(MANUAL)
+  createdAt   DateTime      @default(now())
+
+  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+
+  @@index([playlistId])
+  @@index([playlistId, platform])
+  @@index([createdAt])
+}

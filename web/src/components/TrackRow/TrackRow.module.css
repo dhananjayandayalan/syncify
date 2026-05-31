@@ -1,0 +1,46 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  transition: background 0.1s;
+}
+
+.row:hover { background: var(--color-surface-2); }
+
+.position {
+  width: 24px;
+  text-align: right;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+
+.title {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.artist {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.duration {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.statuses { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+
+.removeBtn { flex-shrink: 0; color: var(--color-text-muted); }

@@ -1,0 +1,99 @@
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
+import { authApi } from '../api/auth.api';
+import { setAccessToken } from '../api/client';
+import { User, PlatformConnection } from '../types';
+
+type AuthStatus = 'unknown' | 'authenticated' | 'unauthenticated';
+
+interface AuthState {
+  status: AuthStatus;
+  user: User | null;
+  connections: PlatformConnection[];
+}
+
+const initialState: AuthState = {
+  status: 'unknown',
+  user: null,
+  connections: [],
+};
+
+export const silentRefresh = createAsyncThunk('auth/silentRefresh', async () => {
+  const data = await authApi.refresh();
+  setAccessToken(data.accessToken);
+  const me = await authApi.getMe();
+  return me;
+});
+
+export const login = createAsyncThunk(
+  'auth/login',
+  async ({ email, password }: { email: string; password: string }) => {
+    const data = await authApi.login(email, password);
+    setAccessToken(data.accessToken);
+    return data;
+  },
+);
+
+export const register = createAsyncThunk(
+  'auth/register',
+  async ({ name, email, password }: { name: string; email: string; password: string }) => {
+    const data = await authApi.register(name, email, password);
+    setAccessToken(data.accessToken);
+    return data;
+  },
+);
+
+export const logout = createAsyncThunk('auth/logout', async () => {
+  await authApi.logout().catch(() => {});
+  setAccessToken(null);
+});
+
+export const fetchMe = createAsyncThunk('auth/fetchMe', async () => {
+  return authApi.getMe();
+});
+
+const authSlice = createSlice({
+  name: 'auth',
+  initialState,
+  reducers: {
+    setConnections(state, action: PayloadAction<PlatformConnection[]>) {
+      state.connections = action.payload;
+    },
+    removeConnection(state, action: PayloadAction<string>) {
+      state.connections = state.connections.filter((c) => c.platform !== action.payload);
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(silentRefresh.fulfilled, (state, action) => {
+        state.status = 'authenticated';
+        state.user = action.payload.user;
+        state.connections = action.payload.connections;
+      })
+      .addCase(silentRefresh.rejected, (state) => {
+        state.status = 'unauthenticated';
+        state.user = null;
+      })
+      .addCase(login.fulfilled, (state, action) => {
+        state.status = 'authenticated';
+        state.user = action.payload.user;
+        state.connections = action.payload.connections ?? [];
+      })
+      .addCase(register.fulfilled, (state, action) => {
+        state.status = 'authenticated';
+        state.user = action.payload.user;
+        state.connections = action.payload.connections ?? [];
+      })
+      .addCase(logout.fulfilled, (state) => {
+        state.status = 'unauthenticated';
+        state.user = null;
+        state.connections = [];
+      })
+      .addCase(fetchMe.fulfilled, (state, action) => {
+        state.user = action.payload.user;
+        state.connections = action.payload.connections;
+      });
+  },
+});
+
+export const { setConnections, removeConnection } = authSlice.actions;
+export default authSlice.reducer;
