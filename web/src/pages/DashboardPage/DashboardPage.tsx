@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store';
-import { fetchPlaylists, deletePlaylist } from '../../store/playlists.slice';
+import { fetchPlaylists, createPlaylist, deletePlaylist } from '../../store/playlists.slice';
 import { fetchMe } from '../../store/auth.slice';
 import { AppShell } from '../../components/AppShell/AppShell';
 import { Button } from '../../components/Button/Button';
 import { Badge } from '../../components/Badge/Badge';
+import { Modal } from '../../components/Modal/Modal';
+import { Input } from '../../components/Input/Input';
 import { ImportModal } from '../../components/ImportModal/ImportModal';
-import { Platform } from '../../types';
+import { useToast } from '../../contexts/ToastContext';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import styles from './DashboardPage.module.css';
 
 export function DashboardPage() {
@@ -29,6 +32,20 @@ export function DashboardPage() {
     dispatch(fetchPlaylists());
     dispatch(fetchMe());
   }, [dispatch]);
+
+  const handleCreate = async () => {
+    if (!newName.trim()) return;
+    setCreating(true);
+    try {
+      await dispatch(createPlaylist({ name: newName.trim(), description: newDesc.trim() || undefined })).unwrap();
+      setShowCreate(false);
+      setNewName('');
+      setNewDesc('');
+      toast.success('Playlist created');
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const handleDeletePlaylist = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -69,6 +86,7 @@ export function DashboardPage() {
             <p className={styles.emptyTitle}>No playlists yet</p>
             <p className={styles.emptySubtitle}>Create a playlist or import one from Spotify or YouTube Music</p>
             <div className={styles.emptyCtas}>
+              <Button size="sm" onClick={() => setShowCreate(true)}>Create playlist</Button>
               <Button variant="secondary" size="sm" onClick={() => setShowImport(true)}>Import</Button>
             </div>
           </div>
@@ -92,8 +110,8 @@ export function DashboardPage() {
                   <span className={styles.playlistDesc}>{playlist.description}</span>
                 )}
                 <div className={styles.playlistLinks}>
-                  {playlist.links.map((l) => (
-                    <Badge key={l.platform} variant={l.isActive ? 'primary' : 'muted'}>
+                  {playlist.links.filter((l) => l.isActive).map((l) => (
+                    <Badge key={l.platform} variant={l.platform === 'SPOTIFY' ? 'primary' : 'danger'}>
                       {l.platform === 'SPOTIFY' ? 'Spotify' : 'YouTube'}
                     </Badge>
                   ))}
@@ -115,7 +133,7 @@ export function DashboardPage() {
         open={showImport}
         onClose={() => setShowImport(false)}
         connections={connections}
-        onImported={() => { setShowImport(false); dispatch(fetchPlaylists()); }}
+        onImported={() => { setShowImport(false); dispatch(fetchPlaylists()); toast.info('Importing… tracks will appear shortly'); }}
       />
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New playlist">
@@ -125,6 +143,6 @@ export function DashboardPage() {
           <Button loading={creating} onClick={handleCreate}>Create</Button>
         </div>
       </Modal>
-    </Layout>
+    </AppShell>
   );
 }

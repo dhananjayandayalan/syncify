@@ -6,7 +6,7 @@ import { tracksApi } from '../../api/tracks.api';
 import { syncApi } from '../../api/sync.api';
 import { logsApi } from '../../api/logs.api';
 import { playlistsApi } from '../../api/playlists.api';
-import { Layout } from '../../components/Layout/Layout';
+import { AppShell } from '../../components/AppShell/AppShell';
 import { Button } from '../../components/Button/Button';
 import { Badge } from '../../components/Badge/Badge';
 import { TrackRow } from '../../components/TrackRow/TrackRow';
@@ -35,13 +35,21 @@ export function PlaylistDetailPage() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
   const [coverSaving, setCoverSaving] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [logsTab, setLogsTab] = useState<Platform | null>(null);
   const [logs, setLogs] = useState<SyncLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
+
+  const linkedPlatforms = useMemo(
+    () => new Set(playlist?.links.map((l) => l.platform) ?? []),
+    [playlist?.links],
+  );
+  const connectedPlatforms = useMemo(
+    () => new Set(connections.map((c) => c.platform)),
+    [connections],
+  );
 
   const loadTracks = useCallback(async () => {
     if (!id) return;
@@ -153,7 +161,7 @@ export function PlaylistDetailPage() {
     [id, dispatch, toast],
   );
 
-  const loadLogs = async (platform: Platform) => {
+  const loadLogs = useCallback(async (platform: Platform) => {
     if (!id) return;
     setLogsLoading(true);
     try {
@@ -162,34 +170,15 @@ export function PlaylistDetailPage() {
     } finally {
       setLogsLoading(false);
     }
-  };
+  }, [id]);
 
   const handleTabChange = useCallback(
     (platform: Platform) => {
       setLogsTab(platform);
       loadLogs(platform);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [id],
+    [loadLogs],
   );
-
-  const handleCoverApply = async (dataUrl: string) => {
-    if (!id) return;
-    setCoverSaving(true);
-    try {
-      await playlistsApi.update(id, { coverImage: dataUrl });
-      dispatch(fetchPlaylist(id));
-    } finally {
-      setCoverSaving(false);
-    }
-  };
-
-  const handleUnlinkPlatform = async (platform: Platform) => {
-    if (!id) return;
-    await dispatch(unlinkPlatform({ id, platform })).unwrap();
-    await loadTracks();
-    dispatch(fetchPlaylist(id));
-  };
 
   if (!playlist) {
     return (
@@ -343,7 +332,7 @@ export function PlaylistDetailPage() {
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
         playlistId={playlist.id}
-        onTrackAdded={() => { loadTracks(); setSearchOpen(false); }}
+        onTrackAdded={() => { loadTracks(); setSearchOpen(false); toast.success('Tracks added'); }}
       />
 
       <ImageCropModal
@@ -351,6 +340,6 @@ export function PlaylistDetailPage() {
         onClose={() => setCropOpen(false)}
         onCrop={handleCoverApply}
       />
-    </Layout>
+    </AppShell>
   );
 }
