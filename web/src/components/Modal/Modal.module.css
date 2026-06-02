@@ -1,3 +1,6 @@
+@keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+
 .overlay {
   position: fixed;
   inset: 0;
@@ -7,17 +10,27 @@
   justify-content: center;
   z-index: 100;
   padding: var(--space-4);
+  animation: overlayIn 100ms ease-out;
+}
+
+.overlayClosing {
+  animation: overlayIn 150ms ease-out reverse forwards;
 }
 
 .modal {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-lg);
   max-height: 90vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   max-width: 100%;
+  animation: modalIn 150ms ease-out;
+}
+
+.modalClosing {
+  animation: modalIn 150ms ease-out reverse forwards;
 }
 
 .header {
@@ -38,6 +51,7 @@
   padding: var(--space-1);
   border-radius: var(--radius-sm);
   line-height: 1;
+  transition: color 0.12s, background 0.12s;
 }
 
 .close:hover { color: var(--color-text); background: var(--color-surface-2); }

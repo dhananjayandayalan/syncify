@@ -4,10 +4,10 @@
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
-  transition: background 0.1s;
+  transition: background 0.1s, transform 0.1s;
 }
 
-.row:hover { background: var(--color-surface-2); }
+.row:hover { background: var(--color-surface-3); transform: translateX(2px); }
 
 .position {
   width: 24px;

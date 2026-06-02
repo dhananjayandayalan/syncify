@@ -12,11 +12,57 @@
 
 .header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: var(--space-5);
   gap: var(--space-4);
 }
+
+.coverWrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.cover {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  display: block;
+}
+
+.coverPlaceholder {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+}
+
+.coverEditBtn {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  padding: 2px 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.coverWrapper:hover .coverEditBtn { opacity: 1; }
+
+.coverEditBtn:disabled { cursor: not-allowed; }
+
+.headerInfo { flex: 1; min-width: 0; }
 
 .title { font-size: 24px; }
 .desc { color: var(--color-text-muted); margin-top: var(--space-1); }

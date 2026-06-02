@@ -1,0 +1,41 @@
+.body { display: flex; flex-direction: column; align-items: center; gap: var(--space-4); }
+
+.canvas {
+  width: 200px;
+  height: 200px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+}
+
+.placeholder {
+  width: 200px;
+  height: 200px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  border: 2px dashed var(--color-border-strong);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.fileLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.fileLabel:hover { background: var(--color-surface-3); }
+
+.fileInput { display: none; }

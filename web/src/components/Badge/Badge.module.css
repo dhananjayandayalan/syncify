@@ -9,8 +9,8 @@
   text-transform: uppercase;
 }
 
-.success { background: rgba(39, 174, 96, 0.15); color: var(--color-success); }
-.warning { background: rgba(243, 156, 18, 0.15); color: var(--color-warning); }
-.danger { background: rgba(231, 76, 60, 0.15); color: var(--color-danger); }
+.success { background: rgba(52,211,153,0.15); color: var(--color-success); }
+.warning { background: rgba(251,191,36,0.15); color: var(--color-warning); }
+.danger { background: rgba(248,113,113,0.15); color: var(--color-danger); }
 .muted { background: var(--color-surface-2); color: var(--color-text-muted); }
-.primary { background: rgba(29, 185, 84, 0.15); color: var(--color-primary); }
+.primary { background: var(--color-primary-muted); color: var(--color-primary); }

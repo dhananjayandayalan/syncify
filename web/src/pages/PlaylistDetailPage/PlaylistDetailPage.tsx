@@ -1,16 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { fetchPlaylist, linkPlatform, unlinkPlatform } from '../../store/playlists.slice';
 import { tracksApi } from '../../api/tracks.api';
 import { syncApi } from '../../api/sync.api';
 import { logsApi } from '../../api/logs.api';
-import { Layout } from '../../components/Layout/Layout';
+import { playlistsApi } from '../../api/playlists.api';
+import { AppShell } from '../../components/AppShell/AppShell';
 import { Button } from '../../components/Button/Button';
 import { Badge } from '../../components/Badge/Badge';
 import { TrackRow } from '../../components/TrackRow/TrackRow';
 import { SearchModal } from '../../components/SearchModal/SearchModal';
+import { ImageCropModal } from '../../components/ImageCropModal/ImageCropModal';
 import { Spinner } from '../../components/Spinner/Spinner';
+import { useToast } from '../../contexts/ToastContext';
 import { Platform, Track, SyncLog } from '../../types';
 import styles from './PlaylistDetailPage.module.css';
 
@@ -23,31 +26,23 @@ const ALL_PLATFORMS: Platform[] = ['SPOTIFY', 'YOUTUBE'];
 export function PlaylistDetailPage() {
   const { id } = useParams<{ id: string }>();
   const dispatch = useAppDispatch();
-  const navigate = useNavigate();
   const playlist = useAppSelector((s) => s.playlists.current);
   const connections = useAppSelector((s) => s.auth.connections);
+  const toast = useToast();
 
   const [tracks, setTracks] = useState<Track[]>([]);
   const [tracksLoading, setTracksLoading] = useState(true);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [coverSaving, setCoverSaving] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [logsTab, setLogsTab] = useState<Platform | null>(null);
   const [logs, setLogs] = useState<SyncLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
 
-  useEffect(() => {
-    if (!id) return;
-    dispatch(fetchPlaylist(id));
-    loadTracks();
-    // Trigger a background sync on page open so latest platform changes are fetched
-    syncApi.trigger(id).catch(() => {});
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [id]);
-
-  async function loadTracks() {
+  const loadTracks = useCallback(async () => {
     if (!id) return;
     setTracksLoading(true);
     try {
@@ -56,9 +51,108 @@ export function PlaylistDetailPage() {
     } finally {
       setTracksLoading(false);
     }
-  }
+  }, [id]);
 
-  async function loadLogs(platform: Platform) {
+  useEffect(() => {
+    if (!id) return;
+    dispatch(fetchPlaylist(id));
+    loadTracks();
+    syncApi.trigger(id).catch(() => {});
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [id, dispatch, loadTracks]);
+
+  const startPolling = useCallback(
+    (dismissLoadingToast: () => void) => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      let ticks = 0;
+      pollRef.current = setInterval(async () => {
+        ticks++;
+        const data = await tracksApi.list(id!).catch(() => null);
+        if (data) {
+          setTracks(data.tracks);
+          const allResolved = data.tracks.every((t) =>
+            t.platformTracks.every((pt) => pt.status !== 'PENDING'),
+          );
+          if (allResolved || ticks >= 8) {
+            clearInterval(pollRef.current!);
+            pollRef.current = null;
+            dismissLoadingToast();
+            if (allResolved) toast.success('Sync complete');
+          }
+        }
+      }, 5000);
+    },
+    [id, toast],
+  );
+
+  const handleSync = useCallback(async () => {
+    if (!id) return;
+    setSyncing(true);
+    try {
+      await syncApi.trigger(id);
+      const dismissLoading = toast.loading('Syncing…');
+      startPolling(dismissLoading);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Sync failed');
+    } finally {
+      setSyncing(false);
+    }
+  }, [id, toast, startPolling]);
+
+  const handleLinkPlatform = useCallback(
+    async (platform: Platform) => {
+      if (!id) return;
+      await dispatch(linkPlatform({ id, platform })).unwrap();
+      await loadTracks();
+      dispatch(fetchPlaylist(id));
+      toast.success(`${PLATFORM_LABELS[platform]} linked`);
+      const dismissLoading = toast.loading('Syncing existing tracks…');
+      startPolling(dismissLoading);
+    },
+    [id, dispatch, loadTracks, toast, startPolling],
+  );
+
+  const handleUnlinkPlatform = useCallback(
+    async (platform: Platform) => {
+      if (!id) return;
+      await dispatch(unlinkPlatform({ id, platform })).unwrap();
+      await loadTracks();
+      dispatch(fetchPlaylist(id));
+      toast.info(`${PLATFORM_LABELS[platform]} unlinked`);
+    },
+    [id, dispatch, loadTracks, toast],
+  );
+
+  const handleRemoveTrack = useCallback(
+    async (trackId: string) => {
+      if (!id) return;
+      setRemovingId(trackId);
+      try {
+        await tracksApi.remove(id, trackId);
+        setTracks((prev) => prev.filter((t) => t.id !== trackId));
+      } finally {
+        setRemovingId(null);
+      }
+    },
+    [id],
+  );
+
+  const handleCoverApply = useCallback(
+    async (dataUrl: string) => {
+      if (!id) return;
+      setCoverSaving(true);
+      try {
+        await playlistsApi.update(id, { coverImage: dataUrl });
+        dispatch(fetchPlaylist(id));
+        toast.success('Cover updated');
+      } finally {
+        setCoverSaving(false);
+      }
+    },
+    [id, dispatch, toast],
+  );
+
+  const loadLogs = async (platform: Platform) => {
     if (!id) return;
     setLogsLoading(true);
     try {
@@ -67,90 +161,36 @@ export function PlaylistDetailPage() {
     } finally {
       setLogsLoading(false);
     }
-  }
-
-  const handleTabChange = (platform: Platform) => {
-    setLogsTab(platform);
-    loadLogs(platform);
   };
 
-  const handleRemoveTrack = async (trackId: string) => {
-    if (!id) return;
-    setRemovingId(trackId);
-    try {
-      await tracksApi.remove(id, trackId);
-      setTracks((prev) => prev.filter((t) => t.id !== trackId));
-    } finally {
-      setRemovingId(null);
-    }
-  };
+  const handleTabChange = useCallback(
+    (platform: Platform) => {
+      setLogsTab(platform);
+      loadLogs(platform);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [id],
+  );
 
-  function startPolling() {
-    if (pollRef.current) clearInterval(pollRef.current);
-    let ticks = 0;
-    pollRef.current = setInterval(async () => {
-      ticks++;
-      const data = await tracksApi.list(id!).catch(() => null);
-      if (data) {
-        setTracks(data.tracks);
-        const allResolved = data.tracks.every((t) =>
-          t.platformTracks.every((pt) => pt.status !== 'PENDING'),
-        );
-        if (allResolved || ticks >= 8) {
-          clearInterval(pollRef.current!);
-          pollRef.current = null;
-          setSyncMsg(allResolved ? null : 'Sync complete');
-          setTimeout(() => setSyncMsg(null), 2000);
-          return;
-        }
-      }
-    }, 5000);
-  }
-
-  const handleSync = async () => {
-    if (!id) return;
-    setSyncing(true);
-    setSyncMsg(null);
-    try {
-      await syncApi.trigger(id);
-      setSyncMsg('Syncing...');
-      startPolling();
-    } catch (e) {
-      setSyncMsg(e instanceof Error ? e.message : 'Sync failed');
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const handleLinkPlatform = async (platform: Platform) => {
-    if (!id) return;
-    await dispatch(linkPlatform({ id, platform })).unwrap();
-    await loadTracks();
-    dispatch(fetchPlaylist(id));
-    setSyncMsg('Syncing existing tracks...');
-    startPolling();
-  };
-
-  const handleUnlinkPlatform = async (platform: Platform) => {
-    if (!id) return;
-    await dispatch(unlinkPlatform({ id, platform })).unwrap();
-    await loadTracks();
-    dispatch(fetchPlaylist(id));
-  };
+  const linkedPlatforms = useMemo(
+    () => new Set(playlist?.links.map((l) => l.platform) ?? []),
+    [playlist?.links],
+  );
+  const connectedPlatforms = useMemo(
+    () => new Set(connections.map((c) => c.platform)),
+    [connections],
+  );
 
   if (!playlist) {
     return (
-      <Layout>
+      <AppShell>
         <div className={styles.center}><Spinner /></div>
-      </Layout>
+      </AppShell>
     );
   }
 
-  const linkedPlatforms = new Set(playlist.links.map((l) => l.platform));
-  const connectedPlatforms = new Set(connections.map((c) => c.platform));
-
   return (
-    <Layout>
+    <AppShell>
       <div className={styles.breadcrumb}>
         <Link to="/">Dashboard</Link>
         <span>/</span>
@@ -158,12 +198,32 @@ export function PlaylistDetailPage() {
       </div>
 
       <div className={styles.header}>
-        <div>
+        <div className={styles.coverWrapper}>
+          {playlist.coverImage ? (
+            <img src={playlist.coverImage} alt="" className={styles.cover} />
+          ) : (
+            <div className={styles.coverPlaceholder}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+            </div>
+          )}
+          <button
+            className={styles.coverEditBtn}
+            onClick={() => setCropOpen(true)}
+            title="Change cover"
+            disabled={coverSaving}
+          >
+            {coverSaving ? '…' : 'Edit'}
+          </button>
+        </div>
+        <div className={styles.headerInfo}>
           <h1 className={styles.title}>{playlist.name}</h1>
           {playlist.description && <p className={styles.desc}>{playlist.description}</p>}
         </div>
         <div className={styles.actions}>
-          {syncMsg && <span className={styles.syncMsg}>{syncMsg}</span>}
           <Button variant="secondary" size="sm" onClick={handleSync} loading={syncing}>
             Sync now
           </Button>
@@ -180,10 +240,7 @@ export function PlaylistDetailPage() {
             <div key={p} className={styles.platformToggle}>
               <Badge variant={isLinked ? 'primary' : 'muted'}>{PLATFORM_LABELS[p]}</Badge>
               {isLinked ? (
-                <button
-                  className={styles.toggleBtn}
-                  onClick={() => handleUnlinkPlatform(p)}
-                >
+                <button className={styles.toggleBtn} onClick={() => handleUnlinkPlatform(p)}>
                   Unlink
                 </button>
               ) : (
@@ -278,6 +335,12 @@ export function PlaylistDetailPage() {
         playlistId={playlist.id}
         onTrackAdded={() => { loadTracks(); setSearchOpen(false); }}
       />
-    </Layout>
+
+      <ImageCropModal
+        open={cropOpen}
+        onClose={() => setCropOpen(false)}
+        onCrop={handleCoverApply}
+      />
+    </AppShell>
   );
 }
