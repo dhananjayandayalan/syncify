@@ -16,5 +16,3 @@ For playlist creation in syncify, we had to create a universal search to search 
  doesn't contains a particular song in spotify, it can skip. But we need to have a stylized log platform for a particular playlist with categorizing the platform with tabs stating which platform doesn't have which song.
 
 And the search has to be regional specific, some songs won't be available in some regions.
-
-claude --resume 194b322a-06e2-4625-ac6e-d2b30ecfacc8

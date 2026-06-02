@@ -1,5 +1,6 @@
 import { prisma } from '../../db/client';
 import { AppError } from '../../lib/errors';
+import { syncQueue } from '../../jobs/queue';
 import type { Platform } from '../../platforms/platform.types';
 
 class PlaylistsService {
@@ -66,16 +67,42 @@ class PlaylistsService {
     });
     if (!conn) throw new AppError(400, `Connect your ${platform} account first`);
 
-    return prisma.playlistLink.upsert({
+    const link = await prisma.playlistLink.upsert({
       where: { playlistId_platform: { playlistId, platform } },
       create: { playlistId, platform, isActive: true },
       update: { isActive: true },
     });
+
+    // Backfill PENDING PlatformTrack rows for any tracks that don't have one for this platform
+    const tracks = await prisma.playlistTrack.findMany({
+      where: { playlistId },
+      include: { platformTracks: { where: { platform } } },
+    });
+    const unlinked = tracks.filter((t) => t.platformTracks.length === 0);
+    if (unlinked.length > 0) {
+      await prisma.platformTrack.createMany({
+        data: unlinked.map((t) => ({
+          playlistTrackId: t.id,
+          platform,
+          status: 'PENDING' as const,
+        })),
+      });
+    }
+
+    // Always trigger a sync — even for empty playlists — so the platform playlist
+    // gets created immediately and platformPlaylistId is written to the DB.
+    // Without this, polling has nothing to fetch from.
+    await syncQueue.add('sync', { playlistId, userId, triggeredBy: 'MANUAL' });
+
+    return link;
   }
 
   async unlinkPlatform(userId: string, playlistId: string, platform: Platform) {
     await this.assertOwner(userId, playlistId);
-    await prisma.playlistLink.deleteMany({ where: { playlistId, platform } });
+    await prisma.playlistLink.updateMany({
+      where: { playlistId, platform },
+      data: { isActive: false },
+    });
   }
 
   private async assertOwner(userId: string, playlistId: string) {

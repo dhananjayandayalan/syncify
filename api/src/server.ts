@@ -11,8 +11,26 @@ import { searchRoutes } from './modules/search/search.routes';
 import { syncRoutes } from './modules/sync/sync.routes';
 import { logsRoutes } from './modules/logs/logs.routes';
 
+function buildLogger() {
+  if (env.NODE_ENV === 'test') return false;
+  if (env.NODE_ENV === 'production') return true;
+  return {
+    transport: {
+      target: 'pino-pretty',
+      options: {
+        colorize: true,
+        translateTime: 'HH:MM:ss',
+        ignore: 'pid,hostname',
+        messageFormat: '{msg}',
+        errorLikeObjectKeys: ['err', 'error'],
+        levelFirst: true,
+      },
+    },
+  };
+}
+
 export async function buildServer() {
-  const app = Fastify({ logger: env.NODE_ENV !== 'test' });
+  const app = Fastify({ logger: buildLogger() });
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);

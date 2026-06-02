@@ -125,20 +125,28 @@ export class SpotifyAdapter implements PlatformAdapter {
   async getPlaylistTracks(
     accessToken: string,
     platformPlaylistId: string,
-  ): Promise<Array<{ platformTrackId: string; isrc?: string }>> {
-    const result: Array<{ platformTrackId: string; isrc?: string }> = [];
+  ): Promise<Array<{ platformTrackId: string; isrc?: string; title?: string; artist?: string; album?: string; durationMs?: number }>> {
+    const result: Array<{ platformTrackId: string; isrc?: string; title?: string; artist?: string; album?: string; durationMs?: number }> = [];
     let nextPath: string | null =
-      `/playlists/${platformPlaylistId}/tracks?fields=next,items(track(id,external_ids))&limit=50`;
+      `/playlists/${platformPlaylistId}/tracks?fields=next,items(track(id,name,artists(name),album(name),duration_ms,external_ids))&limit=50`;
 
     while (nextPath) {
       const data = await sfetch<{
         next: string | null;
-        items: Array<{ track: { id: string; external_ids: { isrc?: string } } | null }>;
+        items: Array<{ track: SpotifyTrack | null }>;
       }>(nextPath, accessToken);
 
       for (const item of data.items) {
         if (item.track?.id) {
-          result.push({ platformTrackId: item.track.id, isrc: item.track.external_ids?.isrc });
+          const t = item.track;
+          result.push({
+            platformTrackId: t.id,
+            isrc: t.external_ids?.isrc,
+            title: t.name,
+            artist: t.artists.map((a) => a.name).join(', '),
+            album: t.album.name,
+            durationMs: t.duration_ms,
+          });
         }
       }
       nextPath = data.next ? data.next.replace(BASE, '') : null;

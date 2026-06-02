@@ -44,7 +44,7 @@ export class YouTubeAdapter implements PlatformAdapter {
   ): Promise<SearchTrack | null> {
     const q = encodeURIComponent(`${query} official audio`);
     const data = await ytfetch<{ items: YTSearchItem[] }>(
-      `/search?part=snippet&type=video&videoCategoryId=10&q=${q}&maxResults=10`,
+      `/search?part=snippet&type=video&q=${q}&maxResults=10`,
       accessToken,
     );
 
@@ -54,7 +54,7 @@ export class YouTubeAdapter implements PlatformAdapter {
       .map((item) => ({ item, score: scoreItem(item, query) }))
       .sort((a, b) => b.score - a.score)[0];
 
-    if (!best || best.score < 0.3) return null;
+    if (!best || best.score < 0.15) return null;
 
     const { item } = best;
     return {

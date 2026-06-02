@@ -43,7 +43,14 @@ export interface PlatformAdapter {
   getPlaylistTracks(
     accessToken: string,
     platformPlaylistId: string,
-  ): Promise<Array<{ platformTrackId: string; isrc?: string }>>;
+  ): Promise<Array<{
+    platformTrackId: string;
+    isrc?: string;
+    title?: string;
+    artist?: string;
+    album?: string;
+    durationMs?: number;
+  }>>;
 
   deletePlaylist(accessToken: string, platformPlaylistId: string): Promise<void>;
 }

@@ -8,6 +8,30 @@ export function getAccessToken(): string | null {
   return accessToken;
 }
 
+// All token refreshes share this promise — prevents concurrent rotations
+let refreshingPromise: Promise<string | null> | null = null;
+
+export function doRefresh(): Promise<string | null> {
+  if (refreshingPromise) return refreshingPromise;
+  refreshingPromise = (async () => {
+    try {
+      const res = await fetch('/api/v1/auth/refresh', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) return null;
+      const data = await res.json() as { accessToken: string };
+      setAccessToken(data.accessToken);
+      return data.accessToken;
+    } catch {
+      return null;
+    } finally {
+      refreshingPromise = null;
+    }
+  })();
+  return refreshingPromise;
+}
+
 type FetchOptions = RequestInit & { skipAuth?: boolean };
 
 async function request<T>(url: string, options: FetchOptions = {}): Promise<T> {
@@ -25,9 +49,9 @@ async function request<T>(url: string, options: FetchOptions = {}): Promise<T> {
   const res = await fetch(url, { ...init, headers, credentials: 'include' });
 
   if (res.status === 401 && !skipAuth) {
-    const refreshed = await tryRefresh();
-    if (refreshed) {
-      headers.set('Authorization', `Bearer ${accessToken}`);
+    const newToken = await doRefresh();
+    if (newToken) {
+      headers.set('Authorization', `Bearer ${newToken}`);
       const retry = await fetch(url, { ...init, headers, credentials: 'include' });
       if (!retry.ok) {
         const err = await retry.json().catch(() => ({ error: 'Request failed' }));
@@ -48,21 +72,6 @@ async function request<T>(url: string, options: FetchOptions = {}): Promise<T> {
 
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
-}
-
-async function tryRefresh(): Promise<boolean> {
-  try {
-    const res = await fetch('/api/v1/auth/refresh', {
-      method: 'POST',
-      credentials: 'include',
-    });
-    if (!res.ok) return false;
-    const data = await res.json() as { accessToken: string };
-    setAccessToken(data.accessToken);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export class ApiError extends Error {

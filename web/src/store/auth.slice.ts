@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { authApi } from '../api/auth.api';
-import { setAccessToken } from '../api/client';
+import { setAccessToken, doRefresh } from '../api/client';
 import { User, PlatformConnection } from '../types';
 
 type AuthStatus = 'unknown' | 'authenticated' | 'unauthenticated';
@@ -20,8 +20,8 @@ const initialState: AuthState = {
 };
 
 export const silentRefresh = createAsyncThunk('auth/silentRefresh', async () => {
-  const data = await authApi.refresh();
-  setAccessToken(data.accessToken);
+  const newToken = await doRefresh();
+  if (!newToken) throw new Error('Refresh failed');
   const me = await authApi.getMe();
   return me;
 });

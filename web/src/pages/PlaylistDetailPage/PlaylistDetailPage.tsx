@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { fetchPlaylist, linkPlatform, unlinkPlatform } from '../../store/playlists.slice';
@@ -33,6 +33,7 @@ export function PlaylistDetailPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [logsTab, setLogsTab] = useState<Platform | null>(null);
   const [logs, setLogs] = useState<SyncLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
@@ -41,6 +42,9 @@ export function PlaylistDetailPage() {
     if (!id) return;
     dispatch(fetchPlaylist(id));
     loadTracks();
+    // Trigger a background sync on page open so latest platform changes are fetched
+    syncApi.trigger(id).catch(() => {});
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [id]);
 
   async function loadTracks() {
@@ -81,14 +85,36 @@ export function PlaylistDetailPage() {
     }
   };
 
+  function startPolling() {
+    if (pollRef.current) clearInterval(pollRef.current);
+    let ticks = 0;
+    pollRef.current = setInterval(async () => {
+      ticks++;
+      const data = await tracksApi.list(id!).catch(() => null);
+      if (data) {
+        setTracks(data.tracks);
+        const allResolved = data.tracks.every((t) =>
+          t.platformTracks.every((pt) => pt.status !== 'PENDING'),
+        );
+        if (allResolved || ticks >= 8) {
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
+          setSyncMsg(allResolved ? null : 'Sync complete');
+          setTimeout(() => setSyncMsg(null), 2000);
+          return;
+        }
+      }
+    }, 5000);
+  }
+
   const handleSync = async () => {
     if (!id) return;
     setSyncing(true);
     setSyncMsg(null);
     try {
       await syncApi.trigger(id);
-      setSyncMsg('Sync queued successfully');
-      setTimeout(() => setSyncMsg(null), 4000);
+      setSyncMsg('Syncing...');
+      startPolling();
     } catch (e) {
       setSyncMsg(e instanceof Error ? e.message : 'Sync failed');
     } finally {
@@ -99,11 +125,17 @@ export function PlaylistDetailPage() {
   const handleLinkPlatform = async (platform: Platform) => {
     if (!id) return;
     await dispatch(linkPlatform({ id, platform })).unwrap();
+    await loadTracks();
+    dispatch(fetchPlaylist(id));
+    setSyncMsg('Syncing existing tracks...');
+    startPolling();
   };
 
   const handleUnlinkPlatform = async (platform: Platform) => {
     if (!id) return;
     await dispatch(unlinkPlatform({ id, platform })).unwrap();
+    await loadTracks();
+    dispatch(fetchPlaylist(id));
   };
 
   if (!playlist) {
