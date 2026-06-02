@@ -78,7 +78,11 @@ class AuthService {
       throw new AppError(401, 'Invalid or expired refresh token');
     }
 
-    await prisma.refreshToken.delete({ where: { tokenHash } });
+    const deleted = await prisma.refreshToken.deleteMany({ where: { tokenHash } });
+    if (deleted.count === 0) {
+      throw new AppError(401, 'Invalid or expired refresh token');
+    }
+
     const newRawToken = generateToken();
     await prisma.refreshToken.create({
       data: { userId: stored.userId, tokenHash: hashToken(newRawToken), expiresAt: addDays(new Date(), 30) },

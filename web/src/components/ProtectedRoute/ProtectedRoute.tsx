@@ -8,12 +8,13 @@ import styles from './ProtectedRoute.module.css';
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch();
   const status = useAppSelector((s) => s.auth.status);
+  const isRefreshing = useAppSelector((s) => s.auth.isRefreshing);
 
   useEffect(() => {
-    if (status === 'unknown') {
+    if (status === 'unknown' && !isRefreshing) {
       dispatch(silentRefresh());
     }
-  }, [status, dispatch]);
+  }, [status, isRefreshing, dispatch]);
 
   if (status === 'unknown') {
     return (

@@ -14,7 +14,7 @@ async function request<T>(url: string, options: FetchOptions = {}): Promise<T> {
   const { skipAuth, ...init } = options;
   const headers = new Headers(init.headers);
 
-  if (!headers.has('Content-Type') && !(init.body instanceof FormData)) {
+  if (init.body !== undefined && !headers.has('Content-Type') && !(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -55,7 +55,6 @@ async function tryRefresh(): Promise<boolean> {
     const res = await fetch('/api/v1/auth/refresh', {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
     });
     if (!res.ok) return false;
     const data = await res.json() as { accessToken: string };
@@ -76,7 +75,9 @@ export class ApiError extends Error {
 export const api = {
   get: <T>(url: string, opts?: FetchOptions) => request<T>(url, { method: 'GET', ...opts }),
   post: <T>(url: string, body?: unknown, opts?: FetchOptions) =>
-    request<T>(url, { method: 'POST', body: JSON.stringify(body), ...opts }),
+    request<T>(url, { method: 'POST', body: body !== undefined ? JSON.stringify(body) : undefined, ...opts }),
+  patch: <T>(url: string, body?: unknown, opts?: FetchOptions) =>
+    request<T>(url, { method: 'PATCH', body: body !== undefined ? JSON.stringify(body) : undefined, ...opts }),
   delete: <T>(url: string, body?: unknown, opts?: FetchOptions) =>
     request<T>(url, { method: 'DELETE', body: body ? JSON.stringify(body) : undefined, ...opts }),
 };

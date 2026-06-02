@@ -12,7 +12,7 @@ export const playlistsApi = {
     api.post<{ playlist: Playlist }>('/api/v1/playlists', { name, description }),
 
   update: (id: string, data: { name?: string; description?: string }) =>
-    api.post<{ playlist: Playlist }>(`/api/v1/playlists/${id}`, data),
+    api.patch<{ playlist: Playlist }>(`/api/v1/playlists/${id}`, data),
 
   delete: (id: string) =>
     api.delete<void>(`/api/v1/playlists/${id}`),

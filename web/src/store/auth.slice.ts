@@ -9,12 +9,14 @@ interface AuthState {
   status: AuthStatus;
   user: User | null;
   connections: PlatformConnection[];
+  isRefreshing: boolean;
 }
 
 const initialState: AuthState = {
   status: 'unknown',
   user: null,
   connections: [],
+  isRefreshing: false,
 };
 
 export const silentRefresh = createAsyncThunk('auth/silentRefresh', async () => {
@@ -64,12 +66,17 @@ const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      .addCase(silentRefresh.pending, (state) => {
+        state.isRefreshing = true;
+      })
       .addCase(silentRefresh.fulfilled, (state, action) => {
+        state.isRefreshing = false;
         state.status = 'authenticated';
         state.user = action.payload.user;
         state.connections = action.payload.connections;
       })
       .addCase(silentRefresh.rejected, (state) => {
+        state.isRefreshing = false;
         state.status = 'unauthenticated';
         state.user = null;
       })

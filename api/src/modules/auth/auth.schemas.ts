@@ -13,7 +13,7 @@ export const LoginBody = z.object({
 
 export const RefreshBody = z.object({
   refreshToken: z.string().min(1).optional(),
-});
+}).nullish();
 
 export const OAuthCallbackQuery = z.object({
   code: z.string().min(1),
