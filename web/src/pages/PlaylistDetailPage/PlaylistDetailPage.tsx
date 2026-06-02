@@ -5,11 +5,13 @@ import { fetchPlaylist, linkPlatform, unlinkPlatform } from '../../store/playlis
 import { tracksApi } from '../../api/tracks.api';
 import { syncApi } from '../../api/sync.api';
 import { logsApi } from '../../api/logs.api';
+import { playlistsApi } from '../../api/playlists.api';
 import { Layout } from '../../components/Layout/Layout';
 import { Button } from '../../components/Button/Button';
 import { Badge } from '../../components/Badge/Badge';
 import { TrackRow } from '../../components/TrackRow/TrackRow';
 import { SearchModal } from '../../components/SearchModal/SearchModal';
+import { ImageCropModal } from '../../components/ImageCropModal/ImageCropModal';
 import { Spinner } from '../../components/Spinner/Spinner';
 import { Platform, Track, SyncLog } from '../../types';
 import styles from './PlaylistDetailPage.module.css';
@@ -33,6 +35,8 @@ export function PlaylistDetailPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [coverSaving, setCoverSaving] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [logsTab, setLogsTab] = useState<Platform | null>(null);
   const [logs, setLogs] = useState<SyncLog[]>([]);
@@ -131,6 +135,17 @@ export function PlaylistDetailPage() {
     startPolling();
   };
 
+  const handleCoverApply = async (dataUrl: string) => {
+    if (!id) return;
+    setCoverSaving(true);
+    try {
+      await playlistsApi.update(id, { coverImage: dataUrl });
+      dispatch(fetchPlaylist(id));
+    } finally {
+      setCoverSaving(false);
+    }
+  };
+
   const handleUnlinkPlatform = async (platform: Platform) => {
     if (!id) return;
     await dispatch(unlinkPlatform({ id, platform })).unwrap();
@@ -158,7 +173,28 @@ export function PlaylistDetailPage() {
       </div>
 
       <div className={styles.header}>
-        <div>
+        <div className={styles.coverWrapper}>
+          {playlist.coverImage ? (
+            <img src={playlist.coverImage} alt="" className={styles.cover} />
+          ) : (
+            <div className={styles.coverPlaceholder}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+            </div>
+          )}
+          <button
+            className={styles.coverEditBtn}
+            onClick={() => setCropOpen(true)}
+            title="Change cover"
+            disabled={coverSaving}
+          >
+            {coverSaving ? '…' : 'Edit'}
+          </button>
+        </div>
+        <div className={styles.headerInfo}>
           <h1 className={styles.title}>{playlist.name}</h1>
           {playlist.description && <p className={styles.desc}>{playlist.description}</p>}
         </div>
@@ -277,6 +313,12 @@ export function PlaylistDetailPage() {
         onClose={() => setSearchOpen(false)}
         playlistId={playlist.id}
         onTrackAdded={() => { loadTracks(); setSearchOpen(false); }}
+      />
+
+      <ImageCropModal
+        open={cropOpen}
+        onClose={() => setCropOpen(false)}
+        onCrop={handleCoverApply}
       />
     </Layout>
   );

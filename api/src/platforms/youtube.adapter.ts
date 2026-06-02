@@ -6,7 +6,11 @@ const BASE = 'https://www.googleapis.com/youtube/v3';
 
 type YTSnippet = { title: string; channelTitle: string; thumbnails?: { default?: { url: string } } };
 type YTSearchItem = { id: { videoId: string }; snippet: YTSnippet };
-type YTPlaylistItem = { id: string; contentDetails: { videoId: string } };
+type YTPlaylistItem = {
+  id: string;
+  contentDetails: { videoId: string };
+  snippet: { title: string; videoOwnerChannelTitle?: string; channelTitle?: string };
+};
 
 async function ytfetch<T>(path: string, token: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
@@ -23,6 +27,17 @@ async function ytfetch<T>(path: string, token: string, init: RequestInit = {}): 
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
+}
+
+// Strip common YouTube title noise so stored titles and Spotify searches are clean
+const YT_NOISE = /\s*[\[(](?:official\s*(?:audio|video|music\s*video|lyric(?:s)?\s*video|visualizer|hd)|lyrics?|live|audio|hd|hq|4k|visualizer|remastered|explicit)[^\])]*\)[\])]|\s*[-|]\s*(?:official\s*(?:audio|video)|lyrics?)\s*$/gi;
+
+function cleanYouTubeTitle(title: string): string {
+  return title.replace(YT_NOISE, '').replace(/\s{2,}/g, ' ').trim();
+}
+
+function cleanYouTubeArtist(channel: string): string {
+  return channel.replace(/\s*-\s*topic$/i, '').replace(/\s*vevo$/i, '').trim();
 }
 
 function scoreItem(item: YTSearchItem, query: string): number {
@@ -118,9 +133,24 @@ export class YouTubeAdapter implements PlatformAdapter {
   async getPlaylistTracks(
     accessToken: string,
     platformPlaylistId: string,
-  ): Promise<Array<{ platformTrackId: string; isrc?: string }>> {
+  ): Promise<Array<{ platformTrackId: string; isrc?: string; title?: string; artist?: string }>> {
     const items = await this.fetchPlaylistItems(accessToken, platformPlaylistId);
-    return items.map((i) => ({ platformTrackId: i.contentDetails.videoId }));
+    return items.map((i) => ({
+      platformTrackId: i.contentDetails.videoId,
+      title: cleanYouTubeTitle(i.snippet.title),
+      artist: cleanYouTubeArtist(i.snippet.videoOwnerChannelTitle ?? i.snippet.channelTitle ?? ''),
+    }));
+  }
+
+  async getUserPlaylists(accessToken: string): Promise<PlatformPlaylist[]> {
+    const data = await ytfetch<{
+      items?: Array<{ id: string; snippet: { title: string }; contentDetails: { itemCount: number } }>;
+    }>('/playlists?part=snippet,contentDetails&mine=true&maxResults=50', accessToken);
+    return (data.items ?? []).map((p) => ({
+      platformPlaylistId: p.id,
+      name: p.snippet.title,
+      trackCount: p.contentDetails.itemCount,
+    }));
   }
 
   async deletePlaylist(accessToken: string, platformPlaylistId: string): Promise<void> {
@@ -133,7 +163,7 @@ export class YouTubeAdapter implements PlatformAdapter {
     do {
       const tokenParam = pageToken ? `&pageToken=${pageToken}` : '';
       const data = await ytfetch<{ nextPageToken?: string; items?: YTPlaylistItem[] }>(
-        `/playlistItems?part=contentDetails&playlistId=${playlistId}&maxResults=50${tokenParam}`,
+        `/playlistItems?part=snippet,contentDetails&playlistId=${playlistId}&maxResults=50${tokenParam}`,
         accessToken,
       );
       items.push(...(data.items ?? []));

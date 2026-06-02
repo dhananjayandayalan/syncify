@@ -52,5 +52,10 @@ export interface PlatformAdapter {
     durationMs?: number;
   }>>;
 
+  getUserPlaylists(accessToken: string): Promise<PlatformPlaylist[]>;
+
+  // Optional — not all platforms support updating playlist cover images via API
+  updateCoverImage?(accessToken: string, platformPlaylistId: string, imageBase64: string): Promise<void>;
+
   deletePlaylist(accessToken: string, platformPlaylistId: string): Promise<void>;
 }

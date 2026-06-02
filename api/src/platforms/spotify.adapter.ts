@@ -154,6 +154,37 @@ export class SpotifyAdapter implements PlatformAdapter {
     return result;
   }
 
+  async updateCoverImage(accessToken: string, platformPlaylistId: string, imageBase64: string): Promise<void> {
+    // Spotify accepts the raw base64 string (no data URL prefix) with Content-Type: image/jpeg
+    // Max 256 KB — our 300×300 JPEG is well under that
+    const url = `${BASE}/playlists/${platformPlaylistId}/images`;
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'image/jpeg',
+      },
+      body: imageBase64,
+    });
+    // 202 Accepted = success (image processing is async on Spotify's side)
+    if (!res.ok && res.status !== 202) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`Spotify image upload ${res.status}: ${body}`);
+    }
+  }
+
+  async getUserPlaylists(accessToken: string): Promise<PlatformPlaylist[]> {
+    const data = await sfetch<{ items: Array<{ id: string; name: string; tracks: { total: number } }> }>(
+      '/me/playlists?limit=50',
+      accessToken,
+    );
+    return (data.items ?? []).map((p) => ({
+      platformPlaylistId: p.id,
+      name: p.name,
+      trackCount: p.tracks.total,
+    }));
+  }
+
   async deletePlaylist(accessToken: string, platformPlaylistId: string): Promise<void> {
     await sfetch(`/playlists/${platformPlaylistId}/followers`, accessToken, { method: 'DELETE' });
   }

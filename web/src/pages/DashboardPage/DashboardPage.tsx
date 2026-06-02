@@ -10,6 +10,7 @@ import { Modal } from '../../components/Modal/Modal';
 import { Input } from '../../components/Input/Input';
 import { PlatformCard } from '../../components/PlatformCard/PlatformCard';
 import { Badge } from '../../components/Badge/Badge';
+import { ImportModal } from '../../components/ImportModal/ImportModal';
 import { Platform } from '../../types';
 import styles from './DashboardPage.module.css';
 
@@ -22,6 +23,7 @@ export function DashboardPage() {
   const [params] = useSearchParams();
 
   const [showCreate, setShowCreate] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [creating, setCreating] = useState(false);
@@ -102,6 +104,7 @@ export function DashboardPage() {
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>Playlists</h2>
+          <Button variant="secondary" size="sm" onClick={() => setShowImport(true)}>Import playlist</Button>
           <Button size="sm" onClick={() => setShowCreate(true)}>+ New playlist</Button>
         </div>
 
@@ -114,6 +117,15 @@ export function DashboardPage() {
         <div className={styles.playlists}>
           {playlists.map((playlist) => (
             <Link key={playlist.id} to={`/playlists/${playlist.id}`} className={styles.playlistCard}>
+              {playlist.coverImage ? (
+                <img src={playlist.coverImage} alt="" className={styles.playlistThumb} />
+              ) : (
+                <div className={styles.playlistThumbPlaceholder}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+                  </svg>
+                </div>
+              )}
               <div className={styles.playlistInfo}>
                 <span className={styles.playlistName}>{playlist.name}</span>
                 {playlist.description && (
@@ -138,6 +150,13 @@ export function DashboardPage() {
           ))}
         </div>
       </section>
+
+      <ImportModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        connections={connections}
+        onImported={() => { setShowImport(false); dispatch(fetchPlaylists()); }}
+      />
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New playlist">
         <div className={styles.createForm}>

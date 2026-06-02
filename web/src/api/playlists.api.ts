@@ -1,5 +1,5 @@
 import { api } from './client';
-import { Playlist, Platform } from '../types';
+import { Playlist, Platform, PlatformPlaylistOption } from '../types';
 
 export const playlistsApi = {
   list: () =>
@@ -11,7 +11,7 @@ export const playlistsApi = {
   create: (name: string, description?: string) =>
     api.post<{ playlist: Playlist }>('/api/v1/playlists', { name, description }),
 
-  update: (id: string, data: { name?: string; description?: string }) =>
+  update: (id: string, data: { name?: string; description?: string; coverImage?: string | null }) =>
     api.patch<{ playlist: Playlist }>(`/api/v1/playlists/${id}`, data),
 
   delete: (id: string) =>
@@ -25,4 +25,10 @@ export const playlistsApi = {
 
   unlinkPlatform: (id: string, platform: Platform) =>
     api.delete<void>(`/api/v1/playlists/${id}/links/${platform}`),
+
+  getPlatformPlaylists: (platform: Platform) =>
+    api.get<{ playlists: PlatformPlaylistOption[] }>(`/api/v1/playlists/platform-playlists?platform=${platform}`),
+
+  importFromPlatform: (platform: Platform, platformPlaylistId: string, name: string) =>
+    api.post<{ playlist: Playlist }>('/api/v1/playlists/import', { platform, platformPlaylistId, name }),
 };
