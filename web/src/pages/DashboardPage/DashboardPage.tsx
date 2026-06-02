@@ -1,26 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store';
-import { fetchPlaylists, createPlaylist, deletePlaylist } from '../../store/playlists.slice';
-import { fetchMe, removeConnection } from '../../store/auth.slice';
-import { authApi } from '../../api/auth.api';
-import { Layout } from '../../components/Layout/Layout';
+import { fetchPlaylists, deletePlaylist } from '../../store/playlists.slice';
+import { fetchMe } from '../../store/auth.slice';
+import { AppShell } from '../../components/AppShell/AppShell';
 import { Button } from '../../components/Button/Button';
-import { Modal } from '../../components/Modal/Modal';
-import { Input } from '../../components/Input/Input';
-import { PlatformCard } from '../../components/PlatformCard/PlatformCard';
 import { Badge } from '../../components/Badge/Badge';
 import { ImportModal } from '../../components/ImportModal/ImportModal';
 import { Platform } from '../../types';
 import styles from './DashboardPage.module.css';
-
-const PLATFORMS: Platform[] = ['SPOTIFY', 'YOUTUBE'];
 
 export function DashboardPage() {
   const dispatch = useAppDispatch();
   const { items: playlists, loading } = useAppSelector((s) => s.playlists);
   const connections = useAppSelector((s) => s.auth.connections);
   const [params] = useSearchParams();
+  const toast = useToast();
+  const confirm = useConfirm();
 
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -34,72 +30,27 @@ export function DashboardPage() {
     dispatch(fetchMe());
   }, [dispatch]);
 
-  const handleCreate = async () => {
-    if (!newName.trim()) return;
-    setCreating(true);
-    try {
-      await dispatch(createPlaylist({ name: newName.trim(), description: newDesc.trim() || undefined })).unwrap();
-      setShowCreate(false);
-      setNewName('');
-      setNewDesc('');
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const handleConnect = async (platform: Platform) => {
-    try {
-      const data =
-        platform === 'SPOTIFY'
-          ? await authApi.getSpotifyAuthUrl()
-          : await authApi.getYoutubeAuthUrl();
-      window.location.href = data.url;
-    } catch {
-      // ignore
-    }
-  };
-
-  const handleDisconnect = async (platform: Platform) => {
-    try {
-      await authApi.disconnectPlatform(platform);
-      dispatch(removeConnection(platform));
-    } catch {
-      // ignore
-    }
-  };
-
   const handleDeletePlaylist = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
-    if (!confirm('Delete this playlist?')) return;
+    const ok = await confirm({
+      title: 'Delete playlist?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
     dispatch(deletePlaylist(id));
+    toast.success('Playlist deleted');
   };
 
-  const getConnectionForPlatform = (platform: Platform) =>
-    connections.find((c) => c.platform === platform);
-
   return (
-    <Layout>
+    <AppShell>
       {oauthError && (
         <div className={styles.alert}>
           Failed to connect platform. Please try again.
           <button onClick={() => setOauthError(false)}>✕</button>
         </div>
       )}
-
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Connected Platforms</h2>
-        <div className={styles.platforms}>
-          {PLATFORMS.map((p) => (
-            <PlatformCard
-              key={p}
-              platform={p}
-              connection={getConnectionForPlatform(p)}
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-            />
-          ))}
-        </div>
-      </section>
 
       <section className={styles.section}>
         <div className={styles.sectionHeader}>
@@ -111,7 +62,16 @@ export function DashboardPage() {
         {loading && <p className={styles.muted}>Loading...</p>}
 
         {!loading && playlists.length === 0 && (
-          <p className={styles.muted}>No playlists yet. Create one to get started.</p>
+          <div className={styles.emptyState}>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className={styles.emptyIcon}>
+              <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+            </svg>
+            <p className={styles.emptyTitle}>No playlists yet</p>
+            <p className={styles.emptySubtitle}>Create a playlist or import one from Spotify or YouTube Music</p>
+            <div className={styles.emptyCtas}>
+              <Button variant="secondary" size="sm" onClick={() => setShowImport(true)}>Import</Button>
+            </div>
+          </div>
         )}
 
         <div className={styles.playlists}>
@@ -131,13 +91,13 @@ export function DashboardPage() {
                 {playlist.description && (
                   <span className={styles.playlistDesc}>{playlist.description}</span>
                 )}
-              </div>
-              <div className={styles.playlistLinks}>
-                {playlist.links.map((l) => (
-                  <Badge key={l.platform} variant={l.isActive ? 'primary' : 'muted'}>
-                    {l.platform === 'SPOTIFY' ? 'Spotify' : 'YouTube'}
-                  </Badge>
-                ))}
+                <div className={styles.playlistLinks}>
+                  {playlist.links.map((l) => (
+                    <Badge key={l.platform} variant={l.isActive ? 'primary' : 'muted'}>
+                      {l.platform === 'SPOTIFY' ? 'Spotify' : 'YouTube'}
+                    </Badge>
+                  ))}
+                </div>
               </div>
               <Button
                 variant="ghost"
