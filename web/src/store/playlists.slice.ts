@@ -43,6 +43,13 @@ export const linkPlatform = createAsyncThunk(
   },
 );
 
+export const importPlaylist = createAsyncThunk(
+  'playlists/import',
+  async ({ platform, platformPlaylistId, name }: { platform: Platform; platformPlaylistId: string; name: string }) => {
+    return playlistsApi.importFromPlatform(platform, platformPlaylistId, name);
+  },
+);
+
 export const unlinkPlatform = createAsyncThunk(
   'playlists/unlinkPlatform',
   async ({ id, platform }: { id: string; platform: Platform }) => {
@@ -76,6 +83,9 @@ const playlistsSlice = createSlice({
         else state.items.push(action.payload.playlist);
       })
       .addCase(createPlaylist.fulfilled, (state, action) => {
+        state.items.unshift(action.payload.playlist);
+      })
+      .addCase(importPlaylist.fulfilled, (state, action) => {
         state.items.unshift(action.payload.playlist);
       })
       .addCase(deletePlaylist.fulfilled, (state, action) => {

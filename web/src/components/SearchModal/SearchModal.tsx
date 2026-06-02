@@ -25,7 +25,8 @@ export function SearchModal({ open, onClose, playlistId, onTrackAdded }: SearchM
   const dispatch = useAppDispatch();
   const { results, loading, error } = useAppSelector((s) => s.search);
   const [query, setQuery] = useState('');
-  const [adding, setAdding] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [submitting, setSubmitting] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -47,28 +48,49 @@ export function SearchModal({ open, onClose, playlistId, onTrackAdded }: SearchM
   useEffect(() => {
     if (!open) {
       setQuery('');
+      setSelected(new Set());
       setAddError(null);
       dispatch(clearResults());
     }
   }, [open, dispatch]);
 
-  const handleAdd = async (result: SearchResult) => {
-    setAdding(result.platformTrackId);
+  // Clear selection when results change (new search)
+  useEffect(() => {
+    setSelected(new Set());
+  }, [results]);
+
+  const toggleSelect = (r: SearchResult) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(r.platformTrackId)) next.delete(r.platformTrackId);
+      else next.add(r.platformTrackId);
+      return next;
+    });
+  };
+
+  const handleAddSelected = async () => {
+    const toAdd = results.filter((r) => selected.has(r.platformTrackId));
+    if (!toAdd.length) return;
+    setSubmitting(true);
     setAddError(null);
     try {
-      await tracksApi.add(playlistId, {
-        title: result.title,
-        artist: result.artist,
-        album: result.album,
-        isrc: result.isrc,
-        durationMs: result.durationMs,
-        spotifyTrackId: result.platformTrackId,
-      });
+      await Promise.all(
+        toAdd.map((r) =>
+          tracksApi.add(playlistId, {
+            title: r.title,
+            artist: r.artist,
+            album: r.album,
+            isrc: r.isrc,
+            durationMs: r.durationMs,
+            spotifyTrackId: r.platformTrackId,
+          }),
+        ),
+      );
       onTrackAdded();
     } catch (e) {
-      setAddError(e instanceof Error ? e.message : 'Failed to add track');
+      setAddError(e instanceof Error ? e.message : 'Failed to add tracks');
     } finally {
-      setAdding(null);
+      setSubmitting(false);
     }
   };
 
@@ -89,26 +111,48 @@ export function SearchModal({ open, onClose, playlistId, onTrackAdded }: SearchM
         {!loading && results.length === 0 && query.trim() && (
           <p className={styles.empty}>No results found</p>
         )}
-        {results.map((r) => (
-          <div key={r.platformTrackId} className={styles.item}>
-            {r.imageUrl && (
-              <img src={r.imageUrl} alt="" className={styles.thumb} />
-            )}
-            <div className={styles.itemInfo}>
-              <span className={styles.itemTitle}>{r.title}</span>
-              <span className={styles.itemArtist}>{r.artist} · {r.album}</span>
-            </div>
-            <span className={styles.itemDuration}>{formatDuration(r.durationMs)}</span>
-            <Button
-              size="sm"
-              loading={adding === r.platformTrackId}
-              onClick={() => handleAdd(r)}
+        {results.map((r) => {
+          const isSelected = selected.has(r.platformTrackId);
+          return (
+            <div
+              key={r.platformTrackId}
+              className={[styles.item, isSelected && styles.itemSelected].filter(Boolean).join(' ')}
+              onClick={() => toggleSelect(r)}
+              role="checkbox"
+              aria-checked={isSelected}
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') toggleSelect(r); }}
             >
-              Add
-            </Button>
-          </div>
-        ))}
+              <div className={[styles.checkbox, isSelected && styles.checkboxChecked].filter(Boolean).join(' ')}>
+                {isSelected && <span className={styles.checkmark}>✓</span>}
+              </div>
+              {r.imageUrl && (
+                <img src={r.imageUrl} alt="" className={styles.thumb} />
+              )}
+              <div className={styles.itemInfo}>
+                <span className={styles.itemTitle}>{r.title}</span>
+                <span className={styles.itemArtist}>{r.artist}{r.album ? ` · ${r.album}` : ''}</span>
+              </div>
+              <span className={styles.itemDuration}>{formatDuration(r.durationMs)}</span>
+            </div>
+          );
+        })}
       </div>
+      {results.length > 0 && (
+        <div className={styles.footer}>
+          <span className={styles.footerCount}>
+            {selected.size > 0 ? `${selected.size} selected` : 'Click tracks to select'}
+          </span>
+          <Button
+            size="sm"
+            disabled={selected.size === 0}
+            loading={submitting}
+            onClick={handleAddSelected}
+          >
+            Add {selected.size > 0 ? `${selected.size} track${selected.size > 1 ? 's' : ''}` : 'tracks'}
+          </Button>
+        </div>
+      )}
     </Modal>
   );
 }

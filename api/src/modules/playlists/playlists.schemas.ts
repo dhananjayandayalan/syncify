@@ -12,8 +12,12 @@ export const UpdatePlaylistBody = z
   .object({
     name: z.string().min(1).max(100).optional(),
     description: z.string().max(300).optional(),
+    coverImage: z.string().nullable().optional(),
   })
-  .refine((d) => Object.keys(d).length > 0, { message: 'At least one field required' });
+  .refine(
+    (d) => d.name !== undefined || d.description !== undefined || d.coverImage !== undefined,
+    { message: 'At least one field required' },
+  );
 
 export const PlaylistIdParam = z.object({ id: z.string().cuid() });
 
@@ -26,4 +30,12 @@ export const LinkPlatformBody = z.object({ platform: PlatformEnum });
 export const UnlinkPlatformParam = z.object({
   id: z.string().cuid(),
   platform: PlatformEnum,
+});
+
+export const PlatformQuery = z.object({ platform: PlatformEnum });
+
+export const ImportPlaylistBody = z.object({
+  platform: PlatformEnum,
+  platformPlaylistId: z.string().min(1),
+  name: z.string().min(1).max(100),
 });

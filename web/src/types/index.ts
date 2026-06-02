@@ -47,6 +47,7 @@ export interface Playlist {
   id: string;
   name: string;
   description: string | null;
+  coverImage: string | null;
   links: PlaylistLink[];
   createdAt: string;
   updatedAt: string;
@@ -61,6 +62,12 @@ export interface SearchResult {
   platformTrackId: string;
   previewUrl?: string;
   imageUrl?: string;
+}
+
+export interface PlatformPlaylistOption {
+  platformPlaylistId: string;
+  name: string;
+  trackCount: number;
 }
 
 export interface SyncLog {

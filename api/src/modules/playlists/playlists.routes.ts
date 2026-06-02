@@ -7,6 +7,8 @@ import {
   DeletePlaylistQuery,
   LinkPlatformBody,
   UnlinkPlatformParam,
+  PlatformQuery,
+  ImportPlaylistBody,
 } from './playlists.schemas';
 import { playlistsService } from './playlists.service';
 
@@ -15,6 +17,23 @@ export async function playlistRoutes(app: FastifyInstance): Promise<void> {
 
   s.get('/', { preHandler: [app.authenticate] }, async (req) => {
     return { playlists: await playlistsService.list(req.user.userId) };
+  });
+
+  s.get('/platform-playlists', {
+    preHandler: [app.authenticate],
+    schema: { querystring: PlatformQuery },
+  }, async (req) => {
+    const playlists = await playlistsService.getPlatformPlaylists(req.user.userId, req.query.platform as any);
+    return { playlists };
+  });
+
+  s.post('/import', {
+    preHandler: [app.authenticate],
+    schema: { body: ImportPlaylistBody },
+  }, async (req, reply) => {
+    const { platform, platformPlaylistId, name } = req.body;
+    const playlist = await playlistsService.importFromPlatform(req.user.userId, platform as any, platformPlaylistId, name);
+    return reply.code(201).send({ playlist });
   });
 
   s.post('/', {
