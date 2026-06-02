@@ -7,8 +7,7 @@ import { AppShell } from '../../components/AppShell/AppShell';
 import { Button } from '../../components/Button/Button';
 import { Badge } from '../../components/Badge/Badge';
 import { ImportModal } from '../../components/ImportModal/ImportModal';
-import { useToast } from '../../contexts/ToastContext';
-import { useConfirm } from '../../contexts/ConfirmContext';
+import { Platform } from '../../types';
 import styles from './DashboardPage.module.css';
 
 export function DashboardPage() {
@@ -19,7 +18,11 @@ export function DashboardPage() {
   const toast = useToast();
   const confirm = useConfirm();
 
+  const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newDesc, setNewDesc] = useState('');
+  const [creating, setCreating] = useState(false);
   const [oauthError, setOauthError] = useState(params.get('oauth_error') === '1');
 
   useEffect(() => {
@@ -53,6 +56,7 @@ export function DashboardPage() {
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>Playlists</h2>
           <Button variant="secondary" size="sm" onClick={() => setShowImport(true)}>Import playlist</Button>
+          <Button size="sm" onClick={() => setShowCreate(true)}>+ New playlist</Button>
         </div>
 
         {loading && <p className={styles.muted}>Loading...</p>}
@@ -77,7 +81,7 @@ export function DashboardPage() {
                 <img src={playlist.coverImage} alt="" className={styles.playlistThumb} />
               ) : (
                 <div className={styles.playlistThumbPlaceholder}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
                   </svg>
                 </div>
@@ -111,12 +115,16 @@ export function DashboardPage() {
         open={showImport}
         onClose={() => setShowImport(false)}
         connections={connections}
-        onImported={() => {
-          setShowImport(false);
-          dispatch(fetchPlaylists());
-          toast.info('Importing… tracks will appear shortly');
-        }}
+        onImported={() => { setShowImport(false); dispatch(fetchPlaylists()); }}
       />
-    </AppShell>
+
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New playlist">
+        <div className={styles.createForm}>
+          <Input label="Name" value={newName} onChange={(e) => setNewName(e.target.value)} autoFocus />
+          <Input label="Description (optional)" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
+          <Button loading={creating} onClick={handleCreate}>Create</Button>
+        </div>
+      </Modal>
+    </Layout>
   );
 }

@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAppDispatch } from '../../store';
 import { importPlaylist } from '../../store/playlists.slice';
 import { playlistsApi } from '../../api/playlists.api';
 import { Modal } from '../Modal/Modal';
 import { Button } from '../Button/Button';
 import { Spinner } from '../Spinner/Spinner';
-import { Platform, PlatformConnection, PlatformPlaylistOption } from '../../types';
+import { Platform, PlatformPlaylistOption, PlatformConnection } from '../../types';
 import styles from './ImportModal.module.css';
 
 interface ImportModalProps {
@@ -22,97 +22,134 @@ const PLATFORM_LABELS: Record<Platform, string> = {
 
 export function ImportModal({ open, onClose, connections, onImported }: ImportModalProps) {
   const dispatch = useAppDispatch();
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform | null>(null);
-  const [playlists, setPlaylists] = useState<PlatformPlaylistOption[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [importing, setImporting] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [platform, setPlatform] = useState<Platform | null>(null);
+  const [platformPlaylists, setPlatformPlaylists] = useState<PlatformPlaylistOption[]>([]);
+  const [loadingPlaylists, setLoadingPlaylists] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!open) {
-      setSelectedPlatform(null);
-      setPlaylists([]);
-      setError(null);
-    }
-  }, [open]);
+  const connectedPlatforms = new Set(connections.map((c) => c.platform));
 
-  useEffect(() => {
-    if (!selectedPlatform) return;
-    setLoading(true);
-    setError(null);
-    playlistsApi
-      .getPlatformPlaylists(selectedPlatform)
-      .then((data) => setPlaylists(data.playlists))
-      .catch(() => setError('Failed to load playlists'))
-      .finally(() => setLoading(false));
-  }, [selectedPlatform]);
-
-  const handleImport = async (option: PlatformPlaylistOption) => {
-    if (!selectedPlatform) return;
-    setImporting(option.platformPlaylistId);
+  const handlePickPlatform = async (p: Platform) => {
+    setPlatform(p);
+    setSelectedId(null);
+    setFetchError(null);
+    setPlatformPlaylists([]);
+    setLoadingPlaylists(true);
     try {
-      await dispatch(
-        importPlaylist({
-          platform: selectedPlatform,
-          platformPlaylistId: option.platformPlaylistId,
-          name: option.name,
-        }),
-      ).unwrap();
-      onImported();
-    } catch {
-      setError('Import failed');
+      const data = await playlistsApi.getPlatformPlaylists(p);
+      setPlatformPlaylists(data.playlists);
+    } catch (e) {
+      setFetchError(e instanceof Error ? e.message : 'Failed to load playlists');
     } finally {
-      setImporting(null);
+      setLoadingPlaylists(false);
     }
   };
 
-  const connectedPlatforms = connections.map((c) => c.platform);
+  const handleImport = async () => {
+    if (!platform || !selectedId) return;
+    const pl = platformPlaylists.find((p) => p.platformPlaylistId === selectedId);
+    if (!pl) return;
+    setImporting(true);
+    setImportError(null);
+    try {
+      await dispatch(importPlaylist({ platform, platformPlaylistId: selectedId, name: pl.name })).unwrap();
+      onImported();
+      handleClose();
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : 'Import failed');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleClose = () => {
+    setPlatform(null);
+    setPlatformPlaylists([]);
+    setSelectedId(null);
+    setFetchError(null);
+    setImportError(null);
+    onClose();
+  };
 
   return (
-    <Modal open={open} onClose={onClose} title="Import playlist" width={520}>
-      {connectedPlatforms.length === 0 ? (
-        <p className={styles.empty}>Connect a platform first to import playlists.</p>
-      ) : !selectedPlatform ? (
-        <div className={styles.platformList}>
-          <p className={styles.hint}>Choose a platform to import from:</p>
-          {connectedPlatforms.map((p) => (
-            <button key={p} className={styles.platformBtn} onClick={() => setSelectedPlatform(p)}>
+    <Modal open={open} onClose={handleClose} title="Import playlist" width={560}>
+      <div className={styles.platformRow}>
+        {(['SPOTIFY', 'YOUTUBE'] as Platform[]).map((p) => {
+          const connected = connectedPlatforms.has(p);
+          return (
+            <button
+              key={p}
+              className={[
+                styles.platformBtn,
+                platform === p && styles.platformBtnActive,
+                !connected && styles.platformBtnDisabled,
+              ].filter(Boolean).join(' ')}
+              onClick={() => connected && handlePickPlatform(p)}
+              disabled={!connected}
+              title={!connected ? `Connect ${PLATFORM_LABELS[p]} first` : `Import from ${PLATFORM_LABELS[p]}`}
+            >
               {PLATFORM_LABELS[p]}
+              {!connected && <span className={styles.notConnected}> (not connected)</span>}
             </button>
-          ))}
-        </div>
-      ) : (
-        <div>
-          <button className={styles.back} onClick={() => setSelectedPlatform(null)}>
-            ← Back
-          </button>
-          <p className={styles.hint}>Select a playlist to import from {PLATFORM_LABELS[selectedPlatform]}:</p>
-          {error && <p className={styles.error}>{error}</p>}
-          {loading ? (
+          );
+        })}
+      </div>
+
+      {platform && (
+        <div className={styles.playlistSection}>
+          {loadingPlaylists && (
             <div className={styles.center}><Spinner /></div>
-          ) : playlists.length === 0 ? (
-            <p className={styles.empty}>No playlists found.</p>
-          ) : (
+          )}
+          {fetchError && <p className={styles.error}>{fetchError}</p>}
+          {!loadingPlaylists && !fetchError && platformPlaylists.length === 0 && (
+            <p className={styles.empty}>No playlists found on {PLATFORM_LABELS[platform]}</p>
+          )}
+          {!loadingPlaylists && platformPlaylists.length > 0 && (
             <div className={styles.list}>
-              {playlists.map((pl) => (
-                <div key={pl.platformPlaylistId} className={styles.item}>
-                  <div className={styles.itemInfo}>
-                    <span className={styles.itemName}>{pl.name}</span>
-                    <span className={styles.itemCount}>{pl.trackCount} tracks</span>
+              {platformPlaylists.map((pl) => (
+                <div
+                  key={pl.platformPlaylistId}
+                  className={[
+                    styles.listItem,
+                    selectedId === pl.platformPlaylistId && styles.listItemSelected,
+                  ].filter(Boolean).join(' ')}
+                  onClick={() => setSelectedId(pl.platformPlaylistId)}
+                  role="radio"
+                  aria-checked={selectedId === pl.platformPlaylistId}
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') setSelectedId(pl.platformPlaylistId); }}
+                >
+                  <div className={[
+                    styles.radio,
+                    selectedId === pl.platformPlaylistId && styles.radioSelected,
+                  ].filter(Boolean).join(' ')} />
+                  <div className={styles.listItemInfo}>
+                    <span className={styles.listItemName}>{pl.name}</span>
+                    <span className={styles.listItemCount}>{pl.trackCount} track{pl.trackCount !== 1 ? 's' : ''}</span>
                   </div>
-                  <Button
-                    size="sm"
-                    loading={importing === pl.platformPlaylistId}
-                    onClick={() => handleImport(pl)}
-                  >
-                    Import
-                  </Button>
                 </div>
               ))}
             </div>
           )}
         </div>
       )}
+
+      {importError && <p className={styles.error}>{importError}</p>}
+
+      <div className={styles.footer}>
+        <Button variant="secondary" size="sm" onClick={handleClose}>Cancel</Button>
+        <Button
+          size="sm"
+          disabled={!selectedId || importing}
+          loading={importing}
+          onClick={handleImport}
+        >
+          Import playlist
+        </Button>
+      </div>
     </Modal>
   );
 }

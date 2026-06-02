@@ -6,7 +6,7 @@ import { tracksApi } from '../../api/tracks.api';
 import { syncApi } from '../../api/sync.api';
 import { logsApi } from '../../api/logs.api';
 import { playlistsApi } from '../../api/playlists.api';
-import { AppShell } from '../../components/AppShell/AppShell';
+import { Layout } from '../../components/Layout/Layout';
 import { Button } from '../../components/Button/Button';
 import { Badge } from '../../components/Badge/Badge';
 import { TrackRow } from '../../components/TrackRow/TrackRow';
@@ -35,6 +35,7 @@ export function PlaylistDetailPage() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
   const [coverSaving, setCoverSaving] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -172,14 +173,23 @@ export function PlaylistDetailPage() {
     [id],
   );
 
-  const linkedPlatforms = useMemo(
-    () => new Set(playlist?.links.map((l) => l.platform) ?? []),
-    [playlist?.links],
-  );
-  const connectedPlatforms = useMemo(
-    () => new Set(connections.map((c) => c.platform)),
-    [connections],
-  );
+  const handleCoverApply = async (dataUrl: string) => {
+    if (!id) return;
+    setCoverSaving(true);
+    try {
+      await playlistsApi.update(id, { coverImage: dataUrl });
+      dispatch(fetchPlaylist(id));
+    } finally {
+      setCoverSaving(false);
+    }
+  };
+
+  const handleUnlinkPlatform = async (platform: Platform) => {
+    if (!id) return;
+    await dispatch(unlinkPlatform({ id, platform })).unwrap();
+    await loadTracks();
+    dispatch(fetchPlaylist(id));
+  };
 
   if (!playlist) {
     return (
@@ -341,6 +351,6 @@ export function PlaylistDetailPage() {
         onClose={() => setCropOpen(false)}
         onCrop={handleCoverApply}
       />
-    </AppShell>
+    </Layout>
   );
 }
