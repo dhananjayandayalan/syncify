@@ -19,4 +19,10 @@ export const tracksApi = {
 
   remove: (playlistId: string, trackId: string) =>
     api.delete<void>(`/api/v1/playlists/${playlistId}/tracks/${trackId}`),
+
+  manualMatch: (playlistId: string, trackId: string, platform: 'SPOTIFY' | 'YOUTUBE', platformTrackId: string) =>
+    api.patch<void>(`/api/v1/playlists/${playlistId}/tracks/${trackId}/match`, { platform, platformTrackId }),
+
+  retryFailed: (playlistId: string) =>
+    api.post<{ retried: number }>(`/api/v1/playlists/${playlistId}/tracks/retry-failed`, {}),
 };

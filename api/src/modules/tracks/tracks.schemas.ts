@@ -15,3 +15,8 @@ export const TrackParam = z.object({
   id: z.string().cuid(),
   trackId: z.string().cuid(),
 });
+
+export const ManualMatchBody = z.object({
+  platform: z.enum(['SPOTIFY', 'YOUTUBE']),
+  platformTrackId: z.string().min(1),
+});

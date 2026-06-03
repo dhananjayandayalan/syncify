@@ -43,12 +43,20 @@ export interface Track {
   createdAt: string;
 }
 
+export interface PlaylistHealth {
+  total: number;
+  synced: number;
+  pending: number;
+  failed: number;
+}
+
 export interface Playlist {
   id: string;
   name: string;
   description: string | null;
   coverImage: string | null;
   links: PlaylistLink[];
+  health?: PlaylistHealth;
   createdAt: string;
   updatedAt: string;
 }
@@ -56,9 +64,9 @@ export interface Playlist {
 export interface SearchResult {
   title: string;
   artist: string;
-  album: string;
+  album?: string;
   isrc?: string;
-  durationMs: number;
+  durationMs?: number;
   platformTrackId: string;
   previewUrl?: string;
   imageUrl?: string;

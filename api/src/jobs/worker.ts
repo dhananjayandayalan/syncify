@@ -2,7 +2,7 @@ import { Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { prisma } from '../db/client';
 import { env } from '../config/env';
-import { syncQueue, SyncJobData } from './queue';
+import { addSyncJob, SyncJobData } from './queue';
 import { processSyncJob } from './sync.worker';
 
 const QUEUE_NAME = 'playlist-sync';
@@ -47,7 +47,7 @@ async function schedulePollingJobs() {
   });
 
   for (const link of links) {
-    await syncQueue.add('sync', {
+    await addSyncJob({
       playlistId: link.playlistId,
       userId: link.playlist.userId,
       triggeredBy: 'POLLING',

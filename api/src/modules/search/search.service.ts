@@ -1,6 +1,42 @@
 import { getValidAccessToken } from '../../platforms/token-refresh';
 import { AppError } from '../../lib/errors';
 
+export async function searchYouTube(userId: string, q: string, limit = 20) {
+  let tokenInfo: { accessToken: string };
+  try {
+    tokenInfo = await getValidAccessToken(userId, 'YOUTUBE');
+  } catch {
+    throw new AppError(400, 'Connect your YouTube account to use search');
+  }
+
+  const query = encodeURIComponent(`${q} official audio`);
+  const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${query}&maxResults=${limit}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${tokenInfo.accessToken}` } });
+  if (!res.ok) throw new AppError(502, 'YouTube search failed');
+
+  const data = await res.json() as {
+    items: Array<{
+      id: { videoId: string };
+      snippet: {
+        title: string;
+        channelTitle: string;
+        thumbnails?: { default?: { url: string } };
+      };
+    }>;
+  };
+
+  const results = (data.items ?? []).map((item) => ({
+    title: item.snippet.title,
+    artist: item.snippet.channelTitle
+      .replace(/\s*-\s*Topic$/i, '')
+      .replace(/\s*VEVO$/i, ''),
+    platformTrackId: item.id.videoId,
+    imageUrl: item.snippet.thumbnails?.default?.url,
+  }));
+
+  return { results, total: results.length, limit, offset: 0 };
+}
+
 export async function searchSpotify(
   userId: string,
   q: string,

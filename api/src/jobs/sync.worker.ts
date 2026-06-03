@@ -94,20 +94,36 @@ async function pullFromPlatform(
     for (const pt of newPlatformTracks) {
       if (!pt.title) continue; // skip tracks without metadata
 
-      // Check duplicate by ISRC
-      if (pt.isrc) {
-        const dup = await prisma.playlistTrack.findFirst({
-          where: { playlistId: playlist.id, isrc: pt.isrc },
+      // Duplicate guard: check by ISRC first, then fall back to title+artist.
+      // This catches concurrent jobs that both read an empty knownIds set.
+      const dupByIsrc = pt.isrc
+        ? await prisma.playlistTrack.findFirst({ where: { playlistId: playlist.id, isrc: pt.isrc } })
+        : null;
+
+      if (dupByIsrc) {
+        await prisma.platformTrack.upsert({
+          where: { playlistTrackId_platform: { playlistTrackId: dupByIsrc.id, platform: link.platform } },
+          create: { playlistTrackId: dupByIsrc.id, platform: link.platform, platformTrackId: pt.platformTrackId, status: 'SYNCED' },
+          update: { platformTrackId: pt.platformTrackId, status: 'SYNCED' },
         });
-        if (dup) {
-          // Track exists by ISRC but missing platformTrack record — backfill it
-          await prisma.platformTrack.upsert({
-            where: { playlistTrackId_platform: { playlistTrackId: dup.id, platform: link.platform } },
-            create: { playlistTrackId: dup.id, platform: link.platform, platformTrackId: pt.platformTrackId, status: 'SYNCED' },
-            update: { platformTrackId: pt.platformTrackId, status: 'SYNCED' },
-          });
-          continue;
-        }
+        continue;
+      }
+
+      const dupByTitle = await prisma.playlistTrack.findFirst({
+        where: {
+          playlistId: playlist.id,
+          title: { equals: pt.title, mode: 'insensitive' },
+          artist: { equals: pt.artist ?? '', mode: 'insensitive' },
+        },
+      });
+
+      if (dupByTitle) {
+        await prisma.platformTrack.upsert({
+          where: { playlistTrackId_platform: { playlistTrackId: dupByTitle.id, platform: link.platform } },
+          create: { playlistTrackId: dupByTitle.id, platform: link.platform, platformTrackId: pt.platformTrackId, status: 'SYNCED' },
+          update: { platformTrackId: pt.platformTrackId, status: 'SYNCED' },
+        });
+        continue;
       }
 
       const track = await prisma.playlistTrack.create({
@@ -156,8 +172,9 @@ async function syncPlatform(
 
   try {
     tokenInfo = await getValidAccessToken(userId, link.platform);
-  } catch {
-    await logSync(playlist.id, link.platform, 'ADD', 'FAILED', triggeredBy, null, null, 'Platform not connected');
+  } catch (err) {
+    await logSync(playlist.id, link.platform, 'ADD', 'FAILED', triggeredBy, null, null,
+      err instanceof Error ? err.message : 'Platform not connected');
     return;
   }
 
@@ -174,8 +191,9 @@ async function syncPlatform(
         where: { playlistId_platform: { playlistId: playlist.id, platform: link.platform } },
         data: { platformPlaylistId },
       });
-    } catch {
-      await logSync(playlist.id, link.platform, 'ADD', 'FAILED', triggeredBy, null, null, 'Failed to create platform playlist');
+    } catch (err) {
+      await logSync(playlist.id, link.platform, 'ADD', 'FAILED', triggeredBy, null, null,
+        err instanceof Error ? err.message : 'Failed to create platform playlist');
       return;
     }
   }
@@ -221,12 +239,13 @@ async function syncPlatform(
         data: { status: 'SYNCED' },
       });
       await logSync(playlist.id, link.platform, 'ADD', 'SUCCESS', triggeredBy, track.title, track.artist, null);
-    } catch {
+    } catch (err) {
       await prisma.platformTrack.updateMany({
         where: { playlistTrackId: track.id, platform: link.platform },
         data: { status: 'FAILED' },
       });
-      await logSync(playlist.id, link.platform, 'ADD', 'FAILED', triggeredBy, track.title, track.artist, 'Failed to add track to platform playlist');
+      await logSync(playlist.id, link.platform, 'ADD', 'FAILED', triggeredBy, track.title, track.artist,
+        err instanceof Error ? err.message : 'Failed to add track to platform playlist');
     }
   }
 

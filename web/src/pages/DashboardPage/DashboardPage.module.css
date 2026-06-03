@@ -5,6 +5,7 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--space-6);
+  gap: var(--space-3);
 }
 
 .sectionTitle { font-size: 20px; }
@@ -16,11 +17,13 @@
   margin-top: var(--space-4);
 }
 
+/* 3-column grid inside each card: [thumb] [info] [delete] */
 .playlistCard {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  column-gap: var(--space-3);
+  padding: var(--space-4);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -28,14 +31,17 @@
   color: var(--color-text);
   transition: border-color 0.15s, background 0.15s;
 }
-.playlistCard:hover { border-color: var(--color-primary); background: var(--color-surface-2); text-decoration: none; }
+.playlistCard:hover {
+  border-color: var(--color-primary);
+  background: var(--color-surface-2);
+  text-decoration: none;
+}
 
 .playlistThumb {
   width: 56px;
   height: 56px;
   border-radius: var(--radius-md);
   object-fit: cover;
-  flex-shrink: 0;
 }
 
 .playlistThumbPlaceholder {
@@ -48,37 +54,56 @@
   align-items: center;
   justify-content: center;
   color: var(--color-text-muted);
-  flex-shrink: 0;
 }
 
-.playlistThumb {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-sm);
-  object-fit: cover;
-  flex-shrink: 0;
+/* min-width: 0 is essential — without it, grid items won't shrink below content size */
+.playlistInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 
-.playlistThumbPlaceholder {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
+.playlistName {
+  display: block;
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.playlistDesc {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.playlistMeta { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+
+.healthBar {
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: var(--color-text-muted);
-  flex-shrink: 0;
+  gap: var(--space-2);
+  margin-top: 2px;
 }
 
-.playlistInfo { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.healthTrack {
+  flex: 1;
+  height: 3px;
+  border-radius: 100px;
+  background: var(--color-surface-3);
+  overflow: hidden;
+  display: flex;
+}
 
-.playlistName { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.healthSynced { background: var(--color-success); height: 100%; transition: width 0.4s ease; }
+.healthPending { background: var(--color-warning); height: 100%; transition: width 0.4s ease; }
+.healthFailed { background: var(--color-danger); height: 100%; transition: width 0.4s ease; }
 
-.playlistDesc { font-size: 12px; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.playlistLinks { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+.healthLabel { font-size: 10px; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
 
 .muted { color: var(--color-text-muted); }
 
@@ -110,3 +135,10 @@
 .emptyTitle { font-size: 18px; font-weight: 600; }
 .emptySubtitle { color: var(--color-text-muted); font-size: 13px; max-width: 320px; }
 .emptyCtas { display: flex; gap: var(--space-3); margin-top: var(--space-2); }
+
+/* Create playlist modal form */
+.createForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}

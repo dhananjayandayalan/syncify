@@ -1,5 +1,6 @@
 import { ReactNode, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { DevPanel } from '../DevPanel/DevPanel';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { logout, removeConnection } from '../../store/auth.slice';
 import { createPlaylist } from '../../store/playlists.slice';
@@ -122,6 +123,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <main className={styles.main}>{children}</main>
+      <DevPanel />
 
       <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New playlist">
         <div className={styles.createForm}>

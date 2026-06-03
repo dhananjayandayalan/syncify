@@ -41,6 +41,24 @@
   flex-shrink: 0;
 }
 
-.statuses { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+.statuses { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+
+.statusGroup { display: flex; align-items: center; gap: 4px; }
+
+.fixBtn {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.1s, background 0.1s;
+  white-space: nowrap;
+}
+
+.fixBtn:hover { opacity: 1; background: var(--color-primary-muted); }
 
 .removeBtn { flex-shrink: 0; color: var(--color-text-muted); }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { fetchPlaylists, createPlaylist, deletePlaylist } from '../../store/playlists.slice';
@@ -11,6 +11,9 @@ import { Input } from '../../components/Input/Input';
 import { ImportModal } from '../../components/ImportModal/ImportModal';
 import { useToast } from '../../contexts/ToastContext';
 import { useConfirm } from '../../contexts/ConfirmContext';
+import { MouseTooltip } from '../../components/MouseTooltip/MouseTooltip';
+import { KeyboardShortcuts } from '../../components/KeyboardShortcuts/KeyboardShortcuts';
+import { PlaylistHealth } from '../../types';
 import styles from './DashboardPage.module.css';
 
 export function DashboardPage() {
@@ -23,6 +26,22 @@ export function DashboardPage() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
+
+  // Mouse-tracking tooltip for truncated playlist names
+  const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
+  const tooltipPosRef = useRef({ x: 0, y: 0 });
+
+  const handleNameEnter = (e: React.MouseEvent<HTMLSpanElement>, name: string) => {
+    const el = e.currentTarget;
+    if (el.scrollWidth > el.clientWidth) {
+      tooltipPosRef.current = { x: e.clientX, y: e.clientY };
+      setTooltip({ text: name, x: e.clientX, y: e.clientY });
+    }
+  };
+  const handleNameMove = (e: React.MouseEvent<HTMLSpanElement>) => {
+    tooltipPosRef.current = { x: e.clientX, y: e.clientY };
+  };
+  const handleNameLeave = () => setTooltip(null);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [creating, setCreating] = useState(false);
@@ -105,17 +124,27 @@ export function DashboardPage() {
                 </div>
               )}
               <div className={styles.playlistInfo}>
-                <span className={styles.playlistName}>{playlist.name}</span>
+                <span
+                  className={styles.playlistName}
+                  onMouseEnter={(e) => handleNameEnter(e, playlist.name)}
+                  onMouseMove={handleNameMove}
+                  onMouseLeave={handleNameLeave}
+                >
+                  {playlist.name}
+                </span>
                 {playlist.description && (
                   <span className={styles.playlistDesc}>{playlist.description}</span>
                 )}
-                <div className={styles.playlistLinks}>
+                <div className={styles.playlistMeta}>
                   {playlist.links.filter((l) => l.isActive).map((l) => (
                     <Badge key={l.platform} variant={l.platform === 'SPOTIFY' ? 'primary' : 'danger'}>
                       {l.platform === 'SPOTIFY' ? 'Spotify' : 'YouTube'}
                     </Badge>
                   ))}
                 </div>
+                {playlist.health && playlist.health.total > 0 && (
+                  <HealthBar health={playlist.health} />
+                )}
               </div>
               <Button
                 variant="ghost"
@@ -143,6 +172,44 @@ export function DashboardPage() {
           <Button loading={creating} onClick={handleCreate}>Create</Button>
         </div>
       </Modal>
+      <KeyboardShortcuts onNewPlaylist={() => setShowCreate(true)} />
+
+      {tooltip && (
+        <MouseTooltip
+          text={tooltip.text}
+          initialX={tooltip.x}
+          initialY={tooltip.y}
+          posRef={tooltipPosRef}
+        />
+      )}
     </AppShell>
+  );
+}
+
+function HealthBar({ health }: { health: PlaylistHealth }) {
+  const { total, synced, pending, failed } = health;
+  const syncedPct = (synced / total) * 100;
+  const pendingPct = (pending / total) * 100;
+  const failedPct = (failed / total) * 100;
+
+  const label = failed > 0
+    ? `${failed} failed`
+    : pending > 0
+      ? `${pending} syncing`
+      : `All synced`;
+
+  return (
+    <div className={styles.healthBar} title={`${synced} synced · ${pending} pending · ${failed} failed`}>
+      <div className={styles.healthTrack}>
+        <div className={styles.healthSynced} style={{ width: `${syncedPct}%` }} />
+        <div className={styles.healthPending} style={{ width: `${pendingPct}%` }} />
+        <div className={styles.healthFailed} style={{ width: `${failedPct}%` }} />
+      </div>
+      <span className={styles.healthLabel} style={{
+        color: failed > 0 ? 'var(--color-danger)' : pending > 0 ? 'var(--color-warning)' : 'var(--color-success)',
+      }}>
+        {label}
+      </span>
+    </div>
   );
 }

@@ -1,19 +1,31 @@
 import { prisma } from '../../db/client';
 import { AppError } from '../../lib/errors';
-import { syncQueue } from '../../jobs/queue';
+import { addSyncJob } from '../../jobs/queue';
 import { getAdapter } from '../../platforms';
 import { getValidAccessToken } from '../../platforms/token-refresh';
 import type { Platform } from '../../platforms/platform.types';
 
 class PlaylistsService {
   async list(userId: string) {
-    return prisma.playlist.findMany({
+    const playlists = await prisma.playlist.findMany({
       where: { userId },
       include: {
         links: { select: { platform: true, isActive: true, platformPlaylistId: true, lastSyncedAt: true } },
-        _count: { select: { tracks: true } },
+        tracks: { select: { platformTracks: { select: { status: true } } } },
       },
       orderBy: { createdAt: 'desc' },
+    });
+
+    return playlists.map((p) => {
+      const allPlatformTracks = p.tracks.flatMap((t) => t.platformTracks);
+      const health = {
+        total: allPlatformTracks.length,
+        synced: allPlatformTracks.filter((pt) => pt.status === 'SYNCED').length,
+        pending: allPlatformTracks.filter((pt) => pt.status === 'PENDING').length,
+        failed: allPlatformTracks.filter((pt) => pt.status === 'NOT_FOUND' || pt.status === 'FAILED').length,
+      };
+      const { tracks: _, ...rest } = p;
+      return { ...rest, _count: { tracks: p.tracks.length }, health };
     });
   }
 
@@ -112,7 +124,7 @@ class PlaylistsService {
     // Always trigger a sync — even for empty playlists — so the platform playlist
     // gets created immediately and platformPlaylistId is written to the DB.
     // Without this, polling has nothing to fetch from.
-    await syncQueue.add('sync', { playlistId, userId, triggeredBy: 'MANUAL' });
+    await addSyncJob({ playlistId, userId, triggeredBy: 'MANUAL' });
 
     return link;
   }
@@ -143,7 +155,7 @@ class PlaylistsService {
         _count: { select: { tracks: true } },
       },
     });
-    await syncQueue.add('sync', { playlistId: playlist.id, userId, triggeredBy: 'MANUAL' });
+    await addSyncJob({ playlistId: playlist.id, userId, triggeredBy: 'MANUAL' });
     return playlist;
   }
 

@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { AddTrackBody, PlaylistIdParam, TrackParam } from './tracks.schemas';
+import { AddTrackBody, PlaylistIdParam, TrackParam, ManualMatchBody } from './tracks.schemas';
 import { tracksService } from './tracks.service';
 
 export async function tracksRoutes(app: FastifyInstance): Promise<void> {
@@ -26,6 +26,22 @@ export async function tracksRoutes(app: FastifyInstance): Promise<void> {
     schema: { params: TrackParam },
   }, async (req, reply) => {
     await tracksService.remove(req.user.userId, req.params.id, req.params.trackId);
+    return reply.code(204).send();
+  });
+
+  s.post('/:id/tracks/retry-failed', {
+    preHandler: [app.authenticate],
+    schema: { params: PlaylistIdParam },
+  }, async (req) => {
+    return tracksService.retryFailed(req.user.userId, req.params.id);
+  });
+
+  s.patch('/:id/tracks/:trackId/match', {
+    preHandler: [app.authenticate],
+    schema: { params: TrackParam, body: ManualMatchBody },
+  }, async (req, reply) => {
+    const { platform, platformTrackId } = req.body;
+    await tracksService.manualMatch(req.user.userId, req.params.id, req.params.trackId, platform, platformTrackId);
     return reply.code(204).send();
   });
 }

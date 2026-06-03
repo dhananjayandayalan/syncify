@@ -12,6 +12,8 @@ import { Badge } from '../../components/Badge/Badge';
 import { TrackRow } from '../../components/TrackRow/TrackRow';
 import { SearchModal } from '../../components/SearchModal/SearchModal';
 import { ImageCropModal } from '../../components/ImageCropModal/ImageCropModal';
+import { ManualMatchModal } from '../../components/ManualMatchModal/ManualMatchModal';
+import { KeyboardShortcuts } from '../../components/KeyboardShortcuts/KeyboardShortcuts';
 import { Spinner } from '../../components/Spinner/Spinner';
 import { useToast } from '../../contexts/ToastContext';
 import { Platform, Track, SyncLog } from '../../types';
@@ -35,8 +37,10 @@ export function PlaylistDetailPage() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [cropOpen, setCropOpen] = useState(false);
   const [coverSaving, setCoverSaving] = useState(false);
+  const [matchTarget, setMatchTarget] = useState<{ trackId: string; platform: Platform; title: string; artist: string } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [logsTab, setLogsTab] = useState<Platform | null>(null);
   const [logs, setLogs] = useState<SyncLog[]>([]);
@@ -161,6 +165,38 @@ export function PlaylistDetailPage() {
     [id, dispatch, toast],
   );
 
+  const handleRetryFailed = useCallback(async () => {
+    if (!id) return;
+    setRetrying(true);
+    try {
+      const { retried } = await tracksApi.retryFailed(id);
+      if (retried > 0) {
+        const dismiss = toast.loading(`Retrying ${retried} failed track${retried > 1 ? 's' : ''}…`);
+        startPolling(dismiss);
+      } else {
+        toast.info('No failed tracks to retry');
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Retry failed');
+    } finally {
+      setRetrying(false);
+    }
+  }, [id, toast, startPolling]);
+
+  const handleManualMatch = useCallback((trackId: string, platform: Platform) => {
+    const track = tracks.find((t) => t.id === trackId);
+    if (!track) return;
+    setMatchTarget({ trackId, platform, title: track.title, artist: track.artist });
+  }, [tracks]);
+
+  const handleMatchApply = useCallback(async (platformTrackId: string) => {
+    if (!matchTarget || !id) return;
+    await tracksApi.manualMatch(id, matchTarget.trackId, matchTarget.platform, platformTrackId);
+    setMatchTarget(null);
+    await loadTracks();
+    toast.success('Match saved — syncing now');
+  }, [matchTarget, id, loadTracks, toast]);
+
   const loadLogs = useCallback(async (platform: Platform) => {
     if (!id) return;
     setLogsLoading(true);
@@ -223,6 +259,11 @@ export function PlaylistDetailPage() {
           {playlist.description && <p className={styles.desc}>{playlist.description}</p>}
         </div>
         <div className={styles.actions}>
+          {tracks.some((t) => t.platformTracks.some((pt) => pt.status === 'NOT_FOUND' || pt.status === 'FAILED')) && (
+            <Button variant="danger" size="sm" onClick={handleRetryFailed} loading={retrying}>
+              Retry failed
+            </Button>
+          )}
           <Button variant="secondary" size="sm" onClick={handleSync} loading={syncing}>
             Sync now
           </Button>
@@ -271,6 +312,7 @@ export function PlaylistDetailPage() {
                 track={track}
                 onRemove={handleRemoveTrack}
                 removing={removingId === track.id}
+                onManualMatch={handleManualMatch}
               />
             ))}
           </div>
@@ -332,6 +374,7 @@ export function PlaylistDetailPage() {
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
         playlistId={playlist.id}
+        connections={connections}
         onTrackAdded={() => { loadTracks(); setSearchOpen(false); toast.success('Tracks added'); }}
       />
 
@@ -340,6 +383,22 @@ export function PlaylistDetailPage() {
         onClose={() => setCropOpen(false)}
         onCrop={handleCoverApply}
       />
+
+      <KeyboardShortcuts
+        onSearch={() => setSearchOpen(true)}
+        onSync={handleSync}
+      />
+
+      {matchTarget && (
+        <ManualMatchModal
+          open={!!matchTarget}
+          onClose={() => setMatchTarget(null)}
+          platform={matchTarget.platform}
+          trackTitle={matchTarget.title}
+          trackArtist={matchTarget.artist}
+          onMatch={handleMatchApply}
+        />
+      )}
     </AppShell>
   );
 }

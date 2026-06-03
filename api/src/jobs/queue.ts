@@ -22,7 +22,17 @@ export const syncQueue = new Queue<SyncJobData>('playlist-sync', {
   defaultJobOptions: {
     attempts: 3,
     backoff: { type: 'exponential', delay: 5_000 },
-    removeOnComplete: 100,
-    removeOnFail: 200,
+    removeOnComplete: true,
+    removeOnFail: true,
   },
 });
+
+// Deduplicated sync trigger — only one sync job per playlist can be queued or active at a time.
+// BullMQ won't add a second job with the same jobId while the first is waiting/active.
+// removeOnComplete: true ensures completed jobs are removed immediately so the next
+// trigger can be queued after the current one finishes.
+export async function addSyncJob(data: SyncJobData) {
+  return syncQueue.add('sync', data, {
+    jobId: `sync-${data.playlistId}`,
+  });
+}

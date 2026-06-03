@@ -1,3 +1,38 @@
+.platformTabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.platformTab {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  text-align: center;
+}
+
+.platformTab:hover:not(.platformTabDisabled) {
+  border-color: var(--color-primary);
+  color: var(--color-text);
+}
+
+.platformTabActive {
+  border-color: var(--color-primary);
+  background: var(--color-primary-muted);
+  color: var(--color-primary);
+}
+
+.platformTabDisabled { opacity: 0.45; cursor: not-allowed; }
+
+.platformTabHint { font-weight: 400; font-size: 11px; color: var(--color-text-subtle); }
+
 .results {
   margin-top: var(--space-4);
   display: flex;

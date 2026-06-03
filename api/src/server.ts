@@ -10,6 +10,7 @@ import { tracksRoutes } from './modules/tracks/tracks.routes';
 import { searchRoutes } from './modules/search/search.routes';
 import { syncRoutes } from './modules/sync/sync.routes';
 import { logsRoutes } from './modules/logs/logs.routes';
+import { devRoutes } from './modules/dev/dev.routes';
 
 function buildLogger() {
   if (env.NODE_ENV === 'test') return false;
@@ -57,6 +58,10 @@ export async function buildServer() {
   await app.register(tracksRoutes, { prefix: '/api/v1/playlists' });
   await app.register(syncRoutes, { prefix: '/api/v1/playlists' });
   await app.register(logsRoutes, { prefix: '/api/v1/playlists' });
+
+  if (env.NODE_ENV !== 'production') {
+    await app.register(devRoutes, { prefix: '/api/v1/dev' });
+  }
 
   app.get('/health', async () => ({ status: 'ok' }));
 

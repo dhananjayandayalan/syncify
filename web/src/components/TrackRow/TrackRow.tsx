@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Track } from '../../types';
+import { Track, Platform } from '../../types';
 import { Badge } from '../Badge/Badge';
 import { Button } from '../Button/Button';
 import styles from './TrackRow.module.css';
@@ -8,6 +8,7 @@ interface TrackRowProps {
   track: Track;
   onRemove: (trackId: string) => void;
   removing?: boolean;
+  onManualMatch?: (trackId: string, platform: Platform) => void;
 }
 
 const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'danger' | 'muted'> = {
@@ -38,7 +39,7 @@ function getRowBorderColor(track: Track): string {
   return 'var(--color-border)';
 }
 
-export const TrackRow = memo(function TrackRow({ track, onRemove, removing }: TrackRowProps) {
+export const TrackRow = memo(function TrackRow({ track, onRemove, removing, onManualMatch }: TrackRowProps) {
   const borderColor = getRowBorderColor(track);
 
   return (
@@ -53,9 +54,20 @@ export const TrackRow = memo(function TrackRow({ track, onRemove, removing }: Tr
       )}
       <div className={styles.statuses}>
         {track.platformTracks.map((pt) => (
-          <Badge key={pt.platform} variant={STATUS_VARIANT[pt.status] ?? 'muted'}>
-            {pt.platform === 'SPOTIFY' ? 'S' : 'YT'} {pt.status}
-          </Badge>
+          <div key={pt.platform} className={styles.statusGroup}>
+            <Badge variant={STATUS_VARIANT[pt.status] ?? 'muted'}>
+              {pt.platform === 'SPOTIFY' ? 'S' : 'YT'} {pt.status}
+            </Badge>
+            {(pt.status === 'NOT_FOUND' || pt.status === 'FAILED') && onManualMatch && (
+              <button
+                className={styles.fixBtn}
+                onClick={(e) => { e.stopPropagation(); onManualMatch(track.id, pt.platform as Platform); }}
+                title={`Find on ${pt.platform === 'SPOTIFY' ? 'Spotify' : 'YouTube Music'} manually`}
+              >
+                Fix
+              </button>
+            )}
+          </div>
         ))}
       </div>
       <Button

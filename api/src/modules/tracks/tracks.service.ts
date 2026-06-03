@@ -1,6 +1,8 @@
 import { prisma } from '../../db/client';
 import { AppError } from '../../lib/errors';
-import { syncQueue } from '../../jobs/queue';
+import { addSyncJob } from '../../jobs/queue';
+import { getAdapter } from '../../platforms';
+import { getValidAccessToken } from '../../platforms/token-refresh';
 
 class TracksService {
   async list(userId: string, playlistId: string) {
@@ -57,7 +59,7 @@ class TracksService {
     });
 
     if (links.length > 0) {
-      await syncQueue.add('sync', { playlistId, userId, triggeredBy: 'MANUAL' });
+      await addSyncJob({ playlistId, userId, triggeredBy: 'MANUAL' });
     }
 
     return track;
@@ -66,8 +68,26 @@ class TracksService {
   async remove(userId: string, playlistId: string, trackId: string) {
     await this.assertOwner(userId, playlistId);
 
-    const track = await prisma.playlistTrack.findUnique({ where: { id: trackId } });
+    const track = await prisma.playlistTrack.findUnique({
+      where: { id: trackId },
+      include: { platformTracks: true },
+    });
     if (!track || track.playlistId !== playlistId) throw new AppError(404, 'Track not found');
+
+    // Remove from platform playlists before deleting from DB
+    const links = await prisma.playlistLink.findMany({ where: { playlistId, isActive: true } });
+    await Promise.allSettled(
+      links.map(async (link) => {
+        const pt = track.platformTracks.find((p) => p.platform === link.platform);
+        if (!pt?.platformTrackId || !link.platformPlaylistId) return;
+        try {
+          const { accessToken } = await getValidAccessToken(userId, link.platform);
+          await getAdapter(link.platform).removeTracks(accessToken, link.platformPlaylistId, [pt.platformTrackId]);
+        } catch {
+          // Non-critical — track is still removed from Syncify
+        }
+      }),
+    );
 
     await prisma.playlistTrack.delete({ where: { id: trackId } });
 
@@ -80,6 +100,41 @@ class TracksService {
     await Promise.all(
       remaining.map((t, i) => prisma.playlistTrack.update({ where: { id: t.id }, data: { position: i } })),
     );
+  }
+
+  async retryFailed(userId: string, playlistId: string) {
+    await this.assertOwner(userId, playlistId);
+    // Reset all NOT_FOUND and FAILED platform tracks back to PENDING
+    const result = await prisma.platformTrack.updateMany({
+      where: {
+        playlistTrack: { playlistId },
+        status: { in: ['NOT_FOUND', 'FAILED'] },
+      },
+      data: { status: 'PENDING' },
+    });
+    if (result.count > 0) {
+      await addSyncJob({ playlistId, userId, triggeredBy: 'MANUAL' });
+    }
+    return { retried: result.count };
+  }
+
+  async manualMatch(
+    userId: string,
+    playlistId: string,
+    trackId: string,
+    platform: 'SPOTIFY' | 'YOUTUBE',
+    platformTrackId: string,
+  ) {
+    await this.assertOwner(userId, playlistId);
+    const track = await prisma.playlistTrack.findUnique({ where: { id: trackId } });
+    if (!track || track.playlistId !== playlistId) throw new AppError(404, 'Track not found');
+
+    await prisma.platformTrack.updateMany({
+      where: { playlistTrackId: trackId, platform },
+      data: { platformTrackId, status: 'PENDING' },
+    });
+
+    await addSyncJob({ playlistId, userId, triggeredBy: 'MANUAL' });
   }
 
   private async assertOwner(userId: string, playlistId: string) {
