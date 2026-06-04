@@ -11,15 +11,26 @@ import { Input } from '../Input/Input';
 import { Platform } from '../../types';
 import styles from './AppShell.module.css';
 
-const PLATFORMS: Platform[] = ['SPOTIFY', 'YOUTUBE'];
-const PLATFORM_LABELS: Record<Platform, string> = { SPOTIFY: 'Spotify', YOUTUBE: 'YouTube Music' };
+const BASE_PLATFORMS: Platform[] = ['SPOTIFY', 'YOUTUBE'];
+const PLATFORM_LABELS: Record<Platform, string> = {
+  SPOTIFY: 'Spotify',
+  YOUTUBE: 'YouTube Music',
+  APPLE_MUSIC: 'Apple Music',
+};
+const PLATFORM_COLOR: Record<Platform, string> = {
+  SPOTIFY: 'var(--color-spotify)',
+  YOUTUBE: 'var(--color-youtube)',
+  APPLE_MUSIC: 'var(--color-apple-music)',
+};
 
 export function AppShell({ children }: { children: ReactNode }) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const user = useAppSelector((s) => s.auth.user);
   const connections = useAppSelector((s) => s.auth.connections);
+  const appleMusicEnabled = useAppSelector((s) => s.auth.appleMusicEnabled);
   const playlists = useAppSelector((s) => s.playlists.items);
+  const platforms: Platform[] = appleMusicEnabled ? [...BASE_PLATFORMS, 'APPLE_MUSIC'] : BASE_PLATFORMS;
 
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
@@ -33,6 +44,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const handleConnect = async (platform: Platform) => {
     try {
+      if (platform === 'APPLE_MUSIC') {
+        await connectAppleMusic();
+        return;
+      }
       const data =
         platform === 'SPOTIFY'
           ? await authApi.getSpotifyAuthUrl()
@@ -41,6 +56,31 @@ export function AppShell({ children }: { children: ReactNode }) {
     } catch {
       // ignore
     }
+  };
+
+  const connectAppleMusic = async () => {
+    const { developerToken } = await authApi.getAppleMusicDeveloperToken();
+
+    // Load MusicKit JS on demand from Apple CDN
+    if (!window.MusicKit) {
+      await new Promise<void>((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://js-cdn.music.apple.com/musickit/v3/musickit.js';
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Failed to load MusicKit JS'));
+        document.head.appendChild(script);
+      });
+    }
+
+    await window.MusicKit.configure({
+      developerToken,
+      app: { name: 'Syncify', build: '1.0.0' },
+    });
+
+    const musicUserToken = await window.MusicKit.getInstance().authorize();
+    await authApi.connectAppleMusic(musicUserToken);
+    // Refresh connections from server
+    window.location.reload();
   };
 
   const handleDisconnect = async (platform: Platform) => {
@@ -97,7 +137,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className={styles.section}>
           <span className={styles.sectionLabel}>Platforms</span>
-          {PLATFORMS.map((p) => {
+          {platforms.map((p) => {
             const connected = connectedPlatforms.has(p);
             return (
               <button
@@ -108,7 +148,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               >
                 <span
                   className={styles.dot}
-                  style={{ background: connected ? (p === 'SPOTIFY' ? 'var(--color-spotify)' : 'var(--color-youtube)') : 'var(--color-text-subtle)' }}
+                  style={{ background: connected ? PLATFORM_COLOR[p] : 'var(--color-text-subtle)' }}
                 />
                 <span className={styles.platformName}>{PLATFORM_LABELS[p]}</span>
               </button>

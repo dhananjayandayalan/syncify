@@ -24,6 +24,10 @@ const schema = z.object({
   YOUTUBE_CLIENT_SECRET: z.string().min(1),
   YOUTUBE_REDIRECT_URI: z.string().url(),
 
+  APPLE_MUSIC_TEAM_ID: z.string().min(1).optional(),
+  APPLE_MUSIC_KEY_ID: z.string().min(1).optional(),
+  APPLE_MUSIC_PRIVATE_KEY: z.string().min(1).optional(),
+
   FRONTEND_URL: z.string().url().default('http://localhost:5173'),
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
 
@@ -41,3 +45,8 @@ if (!result.success) {
 }
 
 export const env = result.data;
+
+export const appleMusicEnabled =
+  !!env.APPLE_MUSIC_TEAM_ID &&
+  !!env.APPLE_MUSIC_KEY_ID &&
+  !!env.APPLE_MUSIC_PRIVATE_KEY;

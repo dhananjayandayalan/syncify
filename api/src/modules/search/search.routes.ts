@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { searchSpotify, searchYouTube } from './search.service';
+import { searchSpotify, searchYouTube, searchAppleMusic } from './search.service';
 
 export async function searchRoutes(app: FastifyInstance): Promise<void> {
   const s = app.withTypeProvider<ZodTypeProvider>();
@@ -12,7 +12,7 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
     schema: {
       querystring: z.object({
         q: z.string().min(1).max(100),
-        platform: z.enum(['SPOTIFY', 'YOUTUBE']).default('SPOTIFY'),
+        platform: z.enum(['SPOTIFY', 'YOUTUBE', 'APPLE_MUSIC']).default('SPOTIFY'),
         market: z.string().length(2).toUpperCase().optional(),
         limit: z.coerce.number().int().min(1).max(50).default(20),
         offset: z.coerce.number().int().min(0).default(0),
@@ -21,6 +21,7 @@ export async function searchRoutes(app: FastifyInstance): Promise<void> {
   }, async (req) => {
     const { q, platform, market, limit, offset } = req.query;
     if (platform === 'YOUTUBE') return searchYouTube(req.user.userId, q, limit);
+    if (platform === 'APPLE_MUSIC') return searchAppleMusic(req.user.userId, q, market, limit);
     return searchSpotify(req.user.userId, q, market, limit, offset);
   });
 }

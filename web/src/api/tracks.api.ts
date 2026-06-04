@@ -1,5 +1,5 @@
 import { api } from './client';
-import { Track } from '../types';
+import { Platform, Track } from '../types';
 
 interface AddTrackPayload {
   title: string;
@@ -20,7 +20,7 @@ export const tracksApi = {
   remove: (playlistId: string, trackId: string) =>
     api.delete<void>(`/api/v1/playlists/${playlistId}/tracks/${trackId}`),
 
-  manualMatch: (playlistId: string, trackId: string, platform: 'SPOTIFY' | 'YOUTUBE', platformTrackId: string) =>
+  manualMatch: (playlistId: string, trackId: string, platform: Platform, platformTrackId: string) =>
     api.patch<void>(`/api/v1/playlists/${playlistId}/tracks/${trackId}/match`, { platform, platformTrackId }),
 
   retryFailed: (playlistId: string) =>

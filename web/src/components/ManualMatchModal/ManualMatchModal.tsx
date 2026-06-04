@@ -19,6 +19,7 @@ interface ManualMatchModalProps {
 const PLATFORM_LABELS: Record<Platform, string> = {
   SPOTIFY: 'Spotify',
   YOUTUBE: 'YouTube Music',
+  APPLE_MUSIC: 'Apple Music',
 };
 
 function formatDuration(ms: number) {

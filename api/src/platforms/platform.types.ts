@@ -1,4 +1,4 @@
-export type Platform = 'SPOTIFY' | 'YOUTUBE';
+export type Platform = 'SPOTIFY' | 'YOUTUBE' | 'APPLE_MUSIC';
 
 export interface SearchTrack {
   title: string;

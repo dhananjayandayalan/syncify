@@ -1,9 +1,10 @@
 import { FastifyInstance } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
+import { z } from 'zod';
 import { RegisterBody, LoginBody, RefreshBody, OAuthCallbackQuery } from './auth.schemas';
 import { authService } from './auth.service';
 import { oauthService } from './oauth.service';
-import { env } from '../../config/env';
+import { env, appleMusicEnabled } from '../../config/env';
 
 const COOKIE_OPTS = {
   httpOnly: true,
@@ -23,7 +24,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const { user, connections, rawRefreshToken } = await authService.register(req.body.name, req.body.email, req.body.password);
     const accessToken = app.jwt.sign({ userId: user.id });
     reply.setCookie('refreshToken', rawRefreshToken, COOKIE_OPTS);
-    return reply.code(201).send({ accessToken, user, connections });
+    return reply.code(201).send({ accessToken, user, connections, features: { appleMusicEnabled } });
   });
 
   server.post('/login', {
@@ -33,7 +34,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     const { user, connections, rawRefreshToken } = await authService.login(req.body.email, req.body.password);
     const accessToken = app.jwt.sign({ userId: user.id });
     reply.setCookie('refreshToken', rawRefreshToken, COOKIE_OPTS);
-    return { accessToken, user, connections };
+    return { accessToken, user, connections, features: { appleMusicEnabled } };
   });
 
   server.post('/refresh', {
@@ -60,7 +61,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   server.get('/me', {
     preHandler: [app.authenticate],
   }, async (req) => {
-    return authService.getMe(req.user.userId);
+    const result = await authService.getMe(req.user.userId);
+    return { ...result, features: { appleMusicEnabled } };
   });
 
   server.get('/spotify/authorize', {
@@ -114,6 +116,29 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     preHandler: [app.authenticate],
   }, async (req, reply) => {
     await oauthService.disconnect(req.user.userId, 'YOUTUBE');
+    return reply.code(204).send();
+  });
+
+  server.get('/apple-music/developer-token', {
+    preHandler: [app.authenticate],
+  }, async (_req, reply) => {
+    if (!appleMusicEnabled) return reply.code(503).send({ error: 'Apple Music is not configured on this server' });
+    return oauthService.getAppleMusicDeveloperToken();
+  });
+
+  server.post('/apple-music/connect', {
+    preHandler: [app.authenticate],
+    schema: { body: z.object({ musicUserToken: z.string().min(10) }) },
+  }, async (req, reply) => {
+    if (!appleMusicEnabled) return reply.code(503).send({ error: 'Apple Music is not configured on this server' });
+    await oauthService.connectAppleMusic(req.user.userId, req.body.musicUserToken);
+    return reply.code(200).send({ success: true });
+  });
+
+  server.delete('/apple-music/disconnect', {
+    preHandler: [app.authenticate],
+  }, async (req, reply) => {
+    await oauthService.disconnect(req.user.userId, 'APPLE_MUSIC');
     return reply.code(204).send();
   });
 }

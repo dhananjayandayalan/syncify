@@ -10,6 +10,7 @@ interface AuthState {
   user: User | null;
   connections: PlatformConnection[];
   isRefreshing: boolean;
+  appleMusicEnabled: boolean;
 }
 
 const initialState: AuthState = {
@@ -17,6 +18,7 @@ const initialState: AuthState = {
   user: null,
   connections: [],
   isRefreshing: false,
+  appleMusicEnabled: false,
 };
 
 export const silentRefresh = createAsyncThunk('auth/silentRefresh', async () => {
@@ -74,6 +76,7 @@ const authSlice = createSlice({
         state.status = 'authenticated';
         state.user = action.payload.user;
         state.connections = action.payload.connections;
+        state.appleMusicEnabled = action.payload.features?.appleMusicEnabled ?? false;
       })
       .addCase(silentRefresh.rejected, (state) => {
         state.isRefreshing = false;
@@ -84,11 +87,13 @@ const authSlice = createSlice({
         state.status = 'authenticated';
         state.user = action.payload.user;
         state.connections = action.payload.connections ?? [];
+        state.appleMusicEnabled = action.payload.features?.appleMusicEnabled ?? false;
       })
       .addCase(register.fulfilled, (state, action) => {
         state.status = 'authenticated';
         state.user = action.payload.user;
         state.connections = action.payload.connections ?? [];
+        state.appleMusicEnabled = action.payload.features?.appleMusicEnabled ?? false;
       })
       .addCase(logout.fulfilled, (state) => {
         state.status = 'unauthenticated';
@@ -98,6 +103,7 @@ const authSlice = createSlice({
       .addCase(fetchMe.fulfilled, (state, action) => {
         state.user = action.payload.user;
         state.connections = action.payload.connections;
+        state.appleMusicEnabled = action.payload.features?.appleMusicEnabled ?? false;
       });
   },
 });

@@ -17,6 +17,6 @@ export const TrackParam = z.object({
 });
 
 export const ManualMatchBody = z.object({
-  platform: z.enum(['SPOTIFY', 'YOUTUBE']),
+  platform: z.enum(['SPOTIFY', 'YOUTUBE', 'APPLE_MUSIC']),
   platformTrackId: z.string().min(1),
 });

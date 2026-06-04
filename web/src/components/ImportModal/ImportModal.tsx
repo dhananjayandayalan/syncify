@@ -18,6 +18,7 @@ interface ImportModalProps {
 const PLATFORM_LABELS: Record<Platform, string> = {
   SPOTIFY: 'Spotify',
   YOUTUBE: 'YouTube Music',
+  APPLE_MUSIC: 'Apple Music',
 };
 
 export function ImportModal({ open, onClose, connections, onImported }: ImportModalProps) {

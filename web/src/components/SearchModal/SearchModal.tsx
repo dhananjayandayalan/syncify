@@ -16,7 +16,11 @@ interface SearchModalProps {
   onTrackAdded: () => void;
 }
 
-const PLATFORM_LABELS: Record<Platform, string> = { SPOTIFY: 'Spotify', YOUTUBE: 'YouTube Music' };
+const PLATFORM_LABELS: Record<Platform, string> = {
+  SPOTIFY: 'Spotify',
+  YOUTUBE: 'YouTube Music',
+  APPLE_MUSIC: 'Apple Music',
+};
 
 function formatDuration(ms: number) {
   const s = Math.floor(ms / 1000);
@@ -25,7 +29,11 @@ function formatDuration(ms: number) {
 
 export function SearchModal({ open, onClose, playlistId, connections, onTrackAdded }: SearchModalProps) {
   const connectedPlatforms = new Set(connections.map((c) => c.platform));
-  const defaultPlatform: Platform = connectedPlatforms.has('SPOTIFY') ? 'SPOTIFY' : 'YOUTUBE';
+  const defaultPlatform: Platform = connectedPlatforms.has('SPOTIFY')
+    ? 'SPOTIFY'
+    : connectedPlatforms.has('YOUTUBE')
+    ? 'YOUTUBE'
+    : 'APPLE_MUSIC';
 
   const [platform, setPlatform] = useState<Platform>(defaultPlatform);
   const [query, setQuery] = useState('');

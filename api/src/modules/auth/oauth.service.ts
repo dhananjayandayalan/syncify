@@ -5,6 +5,7 @@ import { redis } from '../../lib/redis';
 import { env } from '../../config/env';
 import { AppError } from '../../lib/errors';
 import type { Platform } from '../../platforms/platform.types';
+import { getDeveloperToken } from '../../platforms/apple-music.adapter';
 
 const SPOTIFY_SCOPES = [
   'playlist-read-private',
@@ -151,6 +152,45 @@ class OAuthService {
         accessToken: encryptToken(tokens.access_token),
         refreshToken: tokens.refresh_token ? encryptToken(tokens.refresh_token) : undefined,
         expiresAt, platformUserId: channel?.id ?? 'unknown',
+      },
+    });
+  }
+
+  getAppleMusicDeveloperToken(): { developerToken: string } {
+    return { developerToken: getDeveloperToken() };
+  }
+
+  async connectAppleMusic(userId: string, musicUserToken: string): Promise<void> {
+    if (!musicUserToken || musicUserToken.length < 10) {
+      throw new AppError(400, 'Invalid music user token');
+    }
+
+    const devToken = getDeveloperToken();
+    const acctRes = await fetch('https://api.music.apple.com/v1/me/account', {
+      headers: {
+        Authorization: `Bearer ${devToken}`,
+        'Music-User-Token': musicUserToken,
+      },
+    });
+    const storefront = acctRes.ok
+      ? ((await acctRes.json()) as { data?: Array<{ attributes?: { storefront?: string } }> })
+          .data?.[0]?.attributes?.storefront ?? null
+      : null;
+
+    await prisma.platformConnection.upsert({
+      where: { userId_platform: { userId, platform: 'APPLE_MUSIC' } },
+      create: {
+        userId,
+        platform: 'APPLE_MUSIC',
+        accessToken: encryptToken(musicUserToken),
+        refreshToken: null,
+        expiresAt: null,
+        platformUserId: userId,
+        market: storefront,
+      },
+      update: {
+        accessToken: encryptToken(musicUserToken),
+        market: storefront,
       },
     });
   }

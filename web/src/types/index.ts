@@ -1,4 +1,4 @@
-export type Platform = 'SPOTIFY' | 'YOUTUBE';
+export type Platform = 'SPOTIFY' | 'YOUTUBE' | 'APPLE_MUSIC';
 export type TrackStatus = 'PENDING' | 'SYNCED' | 'NOT_FOUND' | 'FAILED';
 export type SyncAction = 'ADD' | 'REMOVE';
 export type SyncLogStatus = 'SUCCESS' | 'FAILED' | 'NOT_FOUND';

@@ -22,8 +22,9 @@ import styles from './PlaylistDetailPage.module.css';
 const PLATFORM_LABELS: Record<Platform, string> = {
   SPOTIFY: 'Spotify',
   YOUTUBE: 'YouTube Music',
+  APPLE_MUSIC: 'Apple Music',
 };
-const ALL_PLATFORMS: Platform[] = ['SPOTIFY', 'YOUTUBE'];
+const ALL_PLATFORMS: Platform[] = ['SPOTIFY', 'YOUTUBE', 'APPLE_MUSIC'];
 
 export function PlaylistDetailPage() {
   const { id } = useParams<{ id: string }>();

@@ -18,7 +18,7 @@ export async function getValidAccessToken(userId: string, platform: Platform): P
 
   const isExpired = conn.expiresAt && conn.expiresAt <= new Date(Date.now() + 60_000);
 
-  if (!isExpired) {
+  if (!isExpired || platform === 'APPLE_MUSIC') {
     return {
       accessToken: decryptToken(conn.accessToken),
       platformUserId: conn.platformUserId,
